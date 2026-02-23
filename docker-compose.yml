@@ -1,0 +1,17 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: zero-shadow-postgres
+    environment:
+      POSTGRES_USER: zeroshadow
+      POSTGRES_PASSWORD: zeroshadow
+      POSTGRES_DB: zeroshadow
+    ports:
+      - "5432:5432"
+    volumes:
+      - zs_pgdata:/var/lib/postgresql/data
+
+volumes:
+  zs_pgdata:
