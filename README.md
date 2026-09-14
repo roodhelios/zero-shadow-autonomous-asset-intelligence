@@ -18,6 +18,15 @@ It supports:
 - preservation of every source observation as evidence
 - stable asset IDs and output ordering
 
+The second working slice adds explainable scoring for fixture-backed findings. Each
+assessment reports the exact points from severity, exposure, exploit evidence, and
+control state. Scores are clamped from 0 to 100 and mapped to low, moderate, high, or
+critical bands.
+
+Asset identity confidence is reported beside the score but never changes it. A weak
+correlation should trigger identity review instead of quietly lowering or raising the
+technical risk of a finding.
+
 IP addresses do not cause merges by themselves. Addresses are often reassigned or
 shared, so they remain evidence until another strong identifier supports correlation.
 
@@ -60,7 +69,11 @@ APIs, scan addresses, or authenticate to external systems. Later discovery conne
 must keep the same explicit scope checks and must be tested against mocks before any
 authorized integration is considered.
 
+Risk inputs are source claims, not verified facts. An `observed` exploit-evidence value
+must come from an owned or explicitly authorized evidence source. The scoring model is
+a transparent triage rule, not a prediction of exploitation or business impact.
+
 ## Next milestone
 
-Add an explainable risk model that scores fixture-backed findings separately from asset
-identity confidence. Risk output must include contributing factors and boundary tests.
+Add remediation priorities that combine the finding score with ownership and due-date
+rules while continuing to show every decision factor.
