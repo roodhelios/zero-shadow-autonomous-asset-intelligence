@@ -1,0 +1,1 @@
+{"finding":{"asset_id":"asset-example","control_state":"unknown","description":"Synthetic service configuration finding","exploit_evidence":"none","finding_id":"finding-1","identity_confidence":"high","severity":"medium","exposure":"limited","source":"synthetic-scanner"},"opened_on":"2026-09-15","owner":"platform-team"}
