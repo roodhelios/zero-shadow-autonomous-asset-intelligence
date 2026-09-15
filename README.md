@@ -27,6 +27,21 @@ Asset identity confidence is reported beside the score but never changes it. A w
 correlation should trigger identity review instead of quietly lowering or raising the
 technical risk of a finding.
 
+The remediation planner turns that assessment into a reviewable P0 to P3 priority. It
+applies visible rules for risk band, ownership, and due-date state while retaining the
+complete risk assessment. Missing ownership and overdue work increase urgency, and a
+requested due date cannot extend the risk-based target window.
+
+Run the local JSON Lines workflow with an explicit review date:
+
+```bash
+python -m engine.remediation_cli examples/remediation-input.jsonl \
+  --as-of 2026-09-15
+```
+
+See [the remediation model](docs/remediation-model.md) for the exact priority and target
+rules.
+
 IP addresses do not cause merges by themselves. Addresses are often reassigned or
 shared, so they remain evidence until another strong identifier supports correlation.
 
@@ -75,5 +90,5 @@ a transparent triage rule, not a prediction of exploitation or business impact.
 
 ## Next milestone
 
-Add remediation priorities that combine the finding score with ownership and due-date
-rules while continuing to show every decision factor.
+Add a fixture-backed ownership directory and generate remediation work queues grouped
+by accountable team without sending tickets or notifications.
