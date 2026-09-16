@@ -1,6 +1,7 @@
 """Local-first asset intelligence primitives for Zero Shadow."""
 
 from .models import AssetObservation, AssetValidationError
+from .ownership import OwnershipDirectory, OwnershipError, OwnershipResolution
 from .remediation import RemediationPlan, plan_remediation
 from .risk import (
     FindingEvidence,
@@ -14,6 +15,9 @@ __all__ = [
     "AssetValidationError",
     "FindingEvidence",
     "FindingValidationError",
+    "OwnershipDirectory",
+    "OwnershipError",
+    "OwnershipResolution",
     "RemediationPlan",
     "RiskAssessment",
     "plan_remediation",
