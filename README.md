@@ -58,6 +58,18 @@ python -m engine.work_queue_cli examples/work-queue-input.jsonl \
 See [the ownership queue notes](docs/ownership-queues.md) for resolution and ambiguity
 rules.
 
+The local evidence schema now connects assets to source observations, findings,
+ownership decisions, and versioned remediation plans. It uses SQLite so its foreign
+keys, value checks, JSON shape checks, and append-only evidence triggers can be tested
+without external infrastructure:
+
+```bash
+python database/schema_check.py database/schema.sql
+```
+
+See [the architecture notes](docs/architecture.md) for evidence lineage and database
+limitations.
+
 IP addresses do not cause merges by themselves. Addresses are often reassigned or
 shared, so they remain evidence until another strong identifier supports correlation.
 
@@ -106,5 +118,5 @@ a transparent triage rule, not a prediction of exploitation or business impact.
 
 ## Next milestone
 
-Define a reviewed database schema for assets, observations, findings, ownership
-decisions, and remediation plans before connecting any Airflow workflow.
+Add a Python repository adapter that writes engine results to the local schema in one
+transaction, with rollback tests for incomplete evidence chains.
