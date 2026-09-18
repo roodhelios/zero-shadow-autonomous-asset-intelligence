@@ -33,12 +33,27 @@ The checker creates an in-memory database and reports tables, indexes, triggers,
 foreign keys. Tests insert a complete synthetic evidence chain and exercise failure
 boundaries.
 
+## Transactional write adapter
+
+`database/repository.py` accepts one correlated asset, its retained observations, one
+finding, one ownership decision, and one remediation plan. It validates their shared
+asset and finding identifiers before opening a transaction. SQLite then inserts the
+linked rows together.
+
+If a later constraint fails, the asset and observations written earlier in that call
+are rolled back. Tests prove this with a duplicate finding identifier that fails after
+a second asset and observation have been attempted. Evidence JSON uses sorted keys and
+compact separators so saved rows remain deterministic for review.
+
+The adapter requires an existing SQLite connection with the reviewed schema. It does
+not create a database, discover assets, or schedule work on its own.
+
 ## Current limits
 
 - SQLite is the review and test dialect. A PostgreSQL migration needs separate syntax,
   transaction, and JSONB tests before any deployed workflow uses it.
-- The schema does not ingest engine objects yet. A repository adapter should own that
-  mapping instead of placing SQL inside scoring or ownership modules.
+- The adapter handles one evidence bundle at a time. It does not yet support batch
+  checkpoints, retries, or a read-side reconstruction API.
 - Append-only triggers protect normal SQL statements, not an administrator who can
   replace the database file or alter the schema.
 - No retention, encryption, backup, or access-control policy is implemented here.

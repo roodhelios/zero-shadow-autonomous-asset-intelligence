@@ -70,6 +70,12 @@ python database/schema_check.py database/schema.sql
 See [the architecture notes](docs/architecture.md) for evidence lineage and database
 limitations.
 
+`database/repository.py` now writes a correlated asset, source observations, finding,
+ownership decision, and remediation plan in one SQLite transaction. It rejects
+cross-asset or cross-finding relationships before writing and rolls back earlier rows
+if a later database constraint fails. Tests use only in-memory SQLite and synthetic
+domain objects.
+
 IP addresses do not cause merges by themselves. Addresses are often reassigned or
 shared, so they remain evidence until another strong identifier supports correlation.
 
@@ -118,5 +124,6 @@ a transparent triage rule, not a prediction of exploitation or business impact.
 
 ## Next milestone
 
-Add a Python repository adapter that writes engine results to the local schema in one
-transaction, with rollback tests for incomplete evidence chains.
+Build a fixture-only Airflow workflow that calls the engine and repository adapter with
+explicit checkpoints. Keep external discovery, ticketing, and cloud credentials out of
+the first DAG.
