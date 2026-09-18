@@ -32,6 +32,10 @@ applies visible rules for risk band, ownership, and due-date state while retaini
 complete risk assessment. Missing ownership and overdue work increase urgency, and a
 requested due date cannot extend the risk-based target window.
 
+The ownership directory resolves exact asset tags to synthetic teams. The work-queue
+command groups resolved plans by team and keeps unmatched or ambiguous items visibly
+unassigned. It never guesses between equally specific rules owned by different teams.
+
 Run the local JSON Lines workflow with an explicit review date:
 
 ```bash
@@ -40,6 +44,18 @@ python -m engine.remediation_cli examples/remediation-input.jsonl \
 ```
 
 See [the remediation model](docs/remediation-model.md) for the exact priority and target
+rules.
+
+Build the example work queues without sending tickets or notifications:
+
+```bash
+python -m engine.work_queue_cli examples/work-queue-input.jsonl \
+  --directory examples/ownership-directory.json \
+  --as-of 2026-09-16 \
+  --output work-queues.json
+```
+
+See [the ownership queue notes](docs/ownership-queues.md) for resolution and ambiguity
 rules.
 
 IP addresses do not cause merges by themselves. Addresses are often reassigned or
@@ -90,5 +106,5 @@ a transparent triage rule, not a prediction of exploitation or business impact.
 
 ## Next milestone
 
-Add a fixture-backed ownership directory and generate remediation work queues grouped
-by accountable team without sending tickets or notifications.
+Define a reviewed database schema for assets, observations, findings, ownership
+decisions, and remediation plans before connecting any Airflow workflow.

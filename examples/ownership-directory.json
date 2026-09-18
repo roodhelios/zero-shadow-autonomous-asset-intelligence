@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "teams": [
+    {
+      "team_id": "application-security",
+      "display_name": "Application Security"
+    },
+    {
+      "team_id": "cloud-platform",
+      "display_name": "Cloud Platform"
+    }
+  ],
+  "rules": [
+    {
+      "rule_id": "cloud-platform-owned",
+      "team_id": "cloud-platform",
+      "match_tags": {
+        "owner_group": "cloud-platform"
+      }
+    },
+    {
+      "rule_id": "internet-facing-review",
+      "team_id": "application-security",
+      "match_tags": {
+        "exposure": "internet"
+      }
+    },
+    {
+      "rule_id": "production-cloud-platform",
+      "team_id": "cloud-platform",
+      "match_tags": {
+        "environment": "production",
+        "owner_group": "cloud-platform"
+      }
+    },
+    {
+      "rule_id": "web-application",
+      "team_id": "application-security",
+      "match_tags": {
+        "service": "web"
+      }
+    }
+  ]
+}
