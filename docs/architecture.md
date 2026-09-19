@@ -48,6 +48,21 @@ compact separators so saved rows remain deterministic for review.
 The adapter requires an existing SQLite connection with the reviewed schema. It does
 not create a database, discover assets, or schedule work on its own.
 
+## Fixture workflow checkpoints
+
+`engine/evidence_workflow.py` connects the existing local components without adding an
+external discovery source. It loads one explicitly scoped fixture, requires exactly one
+correlated asset, scores one finding, resolves ownership, plans remediation, and writes
+the linked bundle through the repository adapter.
+
+The resulting JSON report records `fixture_loaded`, `asset_correlated`, `risk_scored`,
+`ownership_resolved`, `remediation_planned`, and `evidence_persisted` checkpoints. The
+SQLite database and report must be new paths inside the allowed local root. A failed
+workflow removes its incomplete database rather than leaving partial evidence.
+
+The Airflow DAG is a thin manual wrapper around this tested module. It has no schedule,
+credentials, network connector, notification, or ticketing task.
+
 ## Current limits
 
 - SQLite is the review and test dialect. A PostgreSQL migration needs separate syntax,
