@@ -124,6 +124,16 @@ a transparent triage rule, not a prediction of exploitation or business impact.
 
 ## Next milestone
 
-Build a fixture-only Airflow workflow that calls the engine and repository adapter with
-explicit checkpoints. Keep external discovery, ticketing, and cloud credentials out of
-the first DAG.
+The first Airflow DAG is now defined in `airflow/dags/asset_discovery_dag.py`. It runs
+only when triggered manually and uses local paths supplied through environment
+variables. A preflight task validates the local scope before a second task correlates,
+scores, assigns, plans, and persists one synthetic evidence bundle.
+
+The underlying `engine/evidence_workflow.py` module is testable without Airflow. Its
+report records six checkpoints from fixture loading through evidence persistence. The
+runner creates new SQLite and JSON outputs and refuses to overwrite evidence from an
+earlier run.
+
+This milestone does not install Airflow, schedule recurring work, contact cloud APIs,
+or send tickets. The next step is to add a fixture-only retry test using a disposable
+Airflow installation and a run-specific output directory.

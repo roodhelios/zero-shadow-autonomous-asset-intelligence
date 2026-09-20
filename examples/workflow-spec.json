@@ -1,0 +1,22 @@
+{
+  "as_of": "2026-09-19",
+  "asset_fixture": "workflow-assets.json",
+  "decision_id": "ownership-workflow-1",
+  "finding": {
+    "control_state": "missing",
+    "description": "Synthetic internet-facing service lacks a reviewed access control",
+    "exploit_evidence": "none",
+    "finding_id": "finding-workflow-1",
+    "identity_confidence": "high",
+    "exposure": "internet",
+    "severity": "high",
+    "source": "scanner-fixture"
+  },
+  "opened_on": "2026-09-19",
+  "ownership_directory": "ownership-directory.json",
+  "plan_id": "plan-workflow-1",
+  "plan_version": 1,
+  "recorded_at": "2026-09-19T23:00:00Z",
+  "requested_due_date": null,
+  "schema_version": 1
+}
