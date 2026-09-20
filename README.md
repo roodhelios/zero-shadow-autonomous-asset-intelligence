@@ -135,5 +135,14 @@ runner creates new SQLite and JSON outputs and refuses to overwrite evidence fro
 earlier run.
 
 This milestone does not install Airflow, schedule recurring work, contact cloud APIs,
-or send tickets. The next step is to add a fixture-only retry test using a disposable
-Airflow installation and a run-specific output directory.
+or send tickets.
+
+Run-scoped retry handling now derives a fixed directory key from the Airflow run ID.
+The directory contains the SQLite database, workflow report, and a manifest with hashes
+for every input and artifact. A retry reuses a completed run only when those hashes
+still match. Changed input, modified output, or an incomplete directory fails visibly.
+
+The DAG passes its run ID to this boundary and allows one retry. Airflow is not
+installed in the validation environment, so the callable and import boundary are
+tested directly. The next step is to repeat the retry test in a disposable Airflow
+installation and confirm the task-instance behavior.
