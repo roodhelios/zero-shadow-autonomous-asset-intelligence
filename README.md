@@ -142,6 +142,20 @@ The directory contains the SQLite database, workflow report, and a manifest with
 for every input and artifact. A retry reuses a completed run only when those hashes
 still match. Changed input, modified output, or an incomplete directory fails visibly.
 
+Stored evidence can now be reconstructed through a read-only Python boundary:
+
+```bash
+python -m database.evidence_reader_cli path/to/evidence.sqlite \
+  --asset-id asset-id-from-workflow-report \
+  --output asset-evidence.json
+```
+
+The reader returns the asset, retained observations, findings, ownership decisions,
+and remediation plans in deterministic order. It checks that duplicated source and
+finding fields still match their stored JSON evidence, requires a complete linked
+bundle, and adds a SHA-256 digest for comparing exports. The command opens SQLite in
+read-only mode and refuses to replace an existing output file.
+
 The DAG passes its run ID to this boundary and allows one retry. Airflow is not
 installed in the validation environment, so the callable and import boundary are
 tested directly. The next step is to repeat the retry test in a disposable Airflow
