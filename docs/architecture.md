@@ -63,12 +63,40 @@ workflow removes its incomplete database rather than leaving partial evidence.
 The Airflow DAG is a thin manual wrapper around this tested module. It has no schedule,
 credentials, network connector, notification, or ticketing task.
 
+## Run identity and retries
+
+`engine/workflow_runs.py` maps each scheduler run ID to a fixed local directory without
+placing the raw ID in a path. The completed directory contains a database, JSON report,
+and manifest. The manifest binds the run ID to hashes of the specification, schema,
+asset fixture, ownership directory, database, and report.
+
+A retry with unchanged evidence verifies and reuses those artifacts. It does not insert
+the evidence bundle a second time. Changed input, artifact tampering, or a partially
+created directory stops the retry for review. A failed first attempt removes only the
+new directory created for that run.
+
+## Read-side evidence reconstruction
+
+`database/evidence_reader.py` rebuilds one asset snapshot from its linked SQLite rows.
+It reads the database without writing, orders every evidence collection explicitly,
+and checks duplicated source and finding fields against their canonical JSON payloads.
+Missing observations, findings, ownership decisions, or remediation plans fail rather
+than producing a partial asset view.
+
+The export includes a SHA-256 digest over the canonical snapshot body. That digest is
+useful for comparing two local exports. It does not authenticate the database or prove
+who produced the evidence. A trusted signature or independently retained digest would
+be needed to detect replacement of both the database and export.
+
 ## Current limits
 
 - SQLite is the review and test dialect. A PostgreSQL migration needs separate syntax,
   transaction, and JSONB tests before any deployed workflow uses it.
 - The adapter handles one evidence bundle at a time. It does not yet support batch
-  checkpoints, retries, or a read-side reconstruction API.
+  checkpoints. Scheduler retries reuse a completed single-bundle run but do not resume
+  from a partial checkpoint.
+- The retry boundary is tested without Airflow. A disposable scheduler test is still
+  needed before treating task-instance retry behavior as verified.
 - Append-only triggers protect normal SQL statements, not an administrator who can
   replace the database file or alter the schema.
 - No retention, encryption, backup, or access-control policy is implemented here.

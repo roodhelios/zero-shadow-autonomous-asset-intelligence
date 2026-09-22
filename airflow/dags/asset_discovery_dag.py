@@ -6,15 +6,15 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-from engine.evidence_workflow import load_workflow_spec, run_workflow_to_sqlite
+from engine.evidence_workflow import load_workflow_spec
+from engine.workflow_runs import run_workflow_once
 
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[2]
 ROOT = Path(os.getenv("ZERO_SHADOW_ROOT", DEFAULT_ROOT)).resolve()
 SPEC_PATH = Path(os.getenv("ZERO_SHADOW_SPEC", ROOT / "examples/workflow-spec.json"))
 SCHEMA_PATH = Path(os.getenv("ZERO_SHADOW_SCHEMA", ROOT / "database/schema.sql"))
-DATABASE_PATH = Path(os.getenv("ZERO_SHADOW_DATABASE", ROOT / "output/evidence.sqlite"))
-REPORT_PATH = Path(os.getenv("ZERO_SHADOW_REPORT", ROOT / "output/workflow-report.json"))
+OUTPUT_ROOT = Path(os.getenv("ZERO_SHADOW_OUTPUT_ROOT", ROOT / "output/runs"))
 
 
 def preflight() -> dict[str, str]:
@@ -22,16 +22,18 @@ def preflight() -> dict[str, str]:
     return {
         "asset_fixture": str(spec.asset_fixture),
         "ownership_directory": str(spec.ownership_directory),
+        "output_root": str(OUTPUT_ROOT.resolve()),
         "scope_boundary": "local-files-only",
     }
 
 
-def persist_evidence() -> dict:
-    return run_workflow_to_sqlite(
+def persist_evidence(run_id: str | None = None) -> dict:
+    selected_run_id = run_id or os.getenv("ZERO_SHADOW_RUN_ID", "manual-local")
+    return run_workflow_once(
+        run_id=selected_run_id,
         spec_path=SPEC_PATH,
         schema_path=SCHEMA_PATH,
-        database_path=DATABASE_PATH,
-        report_path=REPORT_PATH,
+        output_root=OUTPUT_ROOT,
         allowed_root=ROOT,
     ).to_dict()
 
@@ -48,7 +50,7 @@ else:
         start_date=datetime(2026, 9, 19, tzinfo=timezone.utc),
         schedule=None,
         catchup=False,
-        default_args={"retries": 0},
+        default_args={"retries": 1},
         tags=["zero-shadow", "fixture-only"],
     ) as dag:
         validate_task = PythonOperator(
@@ -58,5 +60,6 @@ else:
         persist_task = PythonOperator(
             task_id="persist_evidence_bundle",
             python_callable=persist_evidence,
+            op_kwargs={"run_id": "{{ run_id }}"},
         )
         validate_task >> persist_task
