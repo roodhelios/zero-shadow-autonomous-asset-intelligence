@@ -174,3 +174,23 @@ The DAG passes its run ID to this boundary and allows one retry. Airflow is not
 installed in the validation environment, so the callable and import boundary are
 tested directly. The next step is to repeat the retry test in a disposable Airflow
 installation and confirm the task-instance behavior.
+
+To authenticate an export across storage or transfer, create a detached HMAC-SHA256
+manifest with a key held separately from the snapshot:
+
+```bash
+python -c "import secrets; open('/secure/path/zero-shadow.key', 'xb').write(secrets.token_bytes(32))"
+chmod 600 /secure/path/zero-shadow.key
+python -m database.evidence_auth_cli create asset-evidence.json \
+  --key-file /secure/path/zero-shadow.key --output asset-evidence.auth.json
+python -m database.evidence_auth_cli verify asset-evidence.json \
+  asset-evidence.auth.json --key-file /secure/path/zero-shadow.key
+```
+
+The manifest authenticates the asset ID and validated snapshot digest. Keep the key
+outside the repository and evidence bundle. HMAC is symmetric: anyone with the key can
+create a valid manifest, so this does not provide non-repudiation or independent
+verification by a party that must not hold the key.
+On POSIX, the CLI refuses a key file readable or writable by group or other users.
+Restrict it to the owner, for example with `chmod 600`, before creating or verifying a
+manifest. Other operating systems may enforce key-file access through different ACLs.
