@@ -191,3 +191,6 @@ The manifest authenticates the asset ID and validated snapshot digest. Keep the 
 outside the repository and evidence bundle. HMAC is symmetric: anyone with the key can
 create a valid manifest, so this does not provide non-repudiation or independent
 verification by a party that must not hold the key.
+On POSIX, the CLI refuses a key file readable or writable by group or other users.
+Restrict it to the owner, for example with `chmod 600`, before creating or verifying a
+manifest. Other operating systems may enforce key-file access through different ACLs.

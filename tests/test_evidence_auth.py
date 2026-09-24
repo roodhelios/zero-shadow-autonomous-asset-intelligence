@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import sqlite3
 import tempfile
 import unittest
@@ -76,6 +77,7 @@ class EvidenceAuthTests(unittest.TestCase):
             manifest_path = root / "snapshot.auth.json"
             snapshot_path.write_text(json.dumps(snapshot()), encoding="utf-8")
             key_path.write_bytes(KEY)
+            key_path.chmod(0o600)
             created = StringIO()
             with redirect_stdout(created):
                 create_status = main([
@@ -98,6 +100,24 @@ class EvidenceAuthTests(unittest.TestCase):
         self.assertEqual((create_status, verify_status, overwrite_status), (0, 0, 2))
         self.assertNotIn(KEY.decode("ascii"), manifest_text)
         self.assertIn("output already exists", errors.getvalue())
+
+    @unittest.skipUnless(os.name == "posix", "POSIX permission bits required")
+    def test_cli_rejects_group_or_world_readable_key(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            snapshot_path = root / "snapshot.json"
+            key_path = root / "key.bin"
+            snapshot_path.write_text(json.dumps(snapshot()), encoding="utf-8")
+            key_path.write_bytes(KEY)
+            key_path.chmod(0o640)
+            errors = StringIO()
+            with redirect_stderr(errors):
+                status = main([
+                    "create", str(snapshot_path), "--key-file", str(key_path),
+                    "--output", str(root / "manifest.json"),
+                ])
+        self.assertEqual(status, 2)
+        self.assertIn("permissions must exclude group and other", errors.getvalue())
 
 
 if __name__ == "__main__":

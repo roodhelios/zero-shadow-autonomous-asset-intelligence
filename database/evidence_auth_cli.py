@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import stat
 import sys
 from pathlib import Path
 from typing import Sequence
@@ -22,6 +24,8 @@ def _key(path: Path) -> bytes:
     resolved = _local(path, "key file", exists=True)
     if not resolved.is_file():
         raise EvidenceAuthError("key file must be a regular local file")
+    if os.name == "posix" and stat.S_IMODE(resolved.stat().st_mode) & 0o077:
+        raise EvidenceAuthError("key file permissions must exclude group and other users")
     key = resolved.read_bytes()
     if len(key) < 32:
         raise EvidenceAuthError("key file must contain at least 32 bytes")
