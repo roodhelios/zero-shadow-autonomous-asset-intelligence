@@ -85,8 +85,16 @@ than producing a partial asset view.
 
 The export includes a SHA-256 digest over the canonical snapshot body. That digest is
 useful for comparing two local exports. It does not authenticate the database or prove
-who produced the evidence. A trusted signature or independently retained digest would
-be needed to detect replacement of both the database and export.
+who produced the evidence. `database/evidence_auth.py` can create a detached
+HMAC-SHA256 manifest for independently stored snapshots. Verification checks the
+version, asset ID, and digest before comparing the manifest, and binds the MAC to both
+the asset ID and digest with a versioned domain prefix. The drift comparator remains
+responsible for validating the complete snapshot record shape.
+
+The HMAC key must remain outside the repository and exported evidence. HMAC provides
+shared-secret authentication only. Every verifier able to check the manifest also has
+the ability to create one, so the model does not provide non-repudiation or third-party
+verification without disclosing the key.
 
 ## Snapshot drift comparison
 
@@ -96,9 +104,10 @@ removed, and modified observations, findings, ownership decisions, and remediati
 plans. Asset field changes are listed separately.
 
 The comparator is detached from discovery and persistence. It cannot open a database,
-contact a cloud account, or decide which snapshot is authoritative. A future production
-boundary would sign or independently anchor reviewed snapshot digests before using a
-diff for enforcement.
+contact a cloud account, or decide which snapshot is authoritative. The detached HMAC
+manifest authenticates snapshots for holders of one shared secret. A future production
+boundary that needs independent verification should use a public-key signature or an
+independently controlled digest store before using a diff for enforcement.
 
 ## Current limits
 
