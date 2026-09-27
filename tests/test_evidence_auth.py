@@ -37,15 +37,15 @@ def snapshot() -> dict:
 class EvidenceAuthTests(unittest.TestCase):
     def test_manifest_authenticates_snapshot_and_is_deterministic(self) -> None:
         value = snapshot()
-        manifest = create_manifest(value, KEY)
-        self.assertEqual(manifest, create_manifest(value, KEY))
+        manifest = create_manifest(value, KEY, key_id="snapshot-key-2026-09")
+        self.assertEqual(manifest, create_manifest(value, KEY, key_id="snapshot-key-2026-09"))
         self.assertEqual(manifest["algorithm"], "HMAC-SHA256")
         self.assertNotIn(KEY.decode("ascii"), json.dumps(manifest))
-        verify_manifest(value, manifest, KEY)
+        verify_manifest(value, manifest, KEY, expected_key_id="snapshot-key-2026-09")
 
     def test_changed_snapshot_fails_even_if_its_digest_is_recomputed(self) -> None:
         value = snapshot()
-        manifest = create_manifest(value, KEY)
+        manifest = create_manifest(value, KEY, key_id="snapshot-key-2026-09")
         changed = json.loads(json.dumps(value))
         changed["asset"]["primary_hostname"] = "changed.example.test"
         body = {key: item for key, item in changed.items() if key != "snapshot_sha256"}
@@ -54,20 +54,24 @@ class EvidenceAuthTests(unittest.TestCase):
                        separators=(",", ":"), sort_keys=True).encode("utf-8")
         ).hexdigest()
         with self.assertRaisesRegex(EvidenceAuthError, "authentication failed"):
-            verify_manifest(changed, manifest, KEY)
+            verify_manifest(changed, manifest, KEY, expected_key_id="snapshot-key-2026-09")
 
     def test_wrong_key_and_short_key_fail(self) -> None:
-        manifest = create_manifest(snapshot(), KEY)
+        manifest = create_manifest(snapshot(), KEY, key_id="snapshot-key-2026-09")
         with self.assertRaisesRegex(EvidenceAuthError, "authentication failed"):
-            verify_manifest(snapshot(), manifest, b"different-test-key-material-32-bytes")
+            verify_manifest(snapshot(), manifest, b"different-test-key-material-32-bytes", expected_key_id="snapshot-key-2026-09")
         with self.assertRaisesRegex(EvidenceAuthError, "at least 32 bytes"):
-            create_manifest(snapshot(), b"short")
+            create_manifest(snapshot(), b"short", key_id="snapshot-key-2026-09")
+        with self.assertRaisesRegex(EvidenceAuthError, "selected key"):
+            verify_manifest(snapshot(), manifest, KEY, expected_key_id="snapshot-key-2026-10")
+        with self.assertRaisesRegex(EvidenceAuthError, "lowercase identifier"):
+            create_manifest(snapshot(), KEY, key_id="INVALID KEY")
 
     def test_unknown_manifest_field_is_rejected(self) -> None:
-        manifest = create_manifest(snapshot(), KEY)
+        manifest = create_manifest(snapshot(), KEY, key_id="snapshot-key-2026-09")
         manifest["key"] = "must-not-be-stored"
         with self.assertRaisesRegex(EvidenceAuthError, "unknown fields"):
-            verify_manifest(snapshot(), manifest, KEY)
+            verify_manifest(snapshot(), manifest, KEY, expected_key_id="snapshot-key-2026-09")
 
     def test_cli_creates_and_verifies_a_detached_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -81,19 +85,19 @@ class EvidenceAuthTests(unittest.TestCase):
             created = StringIO()
             with redirect_stdout(created):
                 create_status = main([
-                    "create", str(snapshot_path), "--key-file", str(key_path),
+                    "create", str(snapshot_path), "--key-file", str(key_path), "--key-id", "snapshot-key-2026-09",
                     "--output", str(manifest_path),
                 ])
             verified = StringIO()
             with redirect_stdout(verified):
                 verify_status = main([
                     "verify", str(snapshot_path), str(manifest_path),
-                    "--key-file", str(key_path),
+                    "--key-file", str(key_path), "--key-id", "snapshot-key-2026-09",
                 ])
             errors = StringIO()
             with redirect_stderr(errors):
                 overwrite_status = main([
-                    "create", str(snapshot_path), "--key-file", str(key_path),
+                    "create", str(snapshot_path), "--key-file", str(key_path), "--key-id", "snapshot-key-2026-09",
                     "--output", str(manifest_path),
                 ])
             manifest_text = manifest_path.read_text(encoding="utf-8")
@@ -113,7 +117,7 @@ class EvidenceAuthTests(unittest.TestCase):
             errors = StringIO()
             with redirect_stderr(errors):
                 status = main([
-                    "create", str(snapshot_path), "--key-file", str(key_path),
+                    "create", str(snapshot_path), "--key-file", str(key_path), "--key-id", "snapshot-key-2026-09",
                     "--output", str(root / "manifest.json"),
                 ])
         self.assertEqual(status, 2)
