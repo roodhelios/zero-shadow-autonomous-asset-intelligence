@@ -96,6 +96,11 @@ shared-secret authentication only. Every verifier able to check the manifest als
 the ability to create one, so the model does not provide non-repudiation or third-party
 verification without disclosing the key.
 
+Manifest version 2 includes a validated key ID inside the authenticated message. This
+lets operators select a retained verification key during rotation without putting key
+material in the manifest. The key ID is a label, not a secret or trust decision. Old
+keys still need an explicit retirement and deletion procedure outside this repository.
+
 ## Snapshot drift comparison
 
 `database/evidence_diff.py` verifies two exported digests before comparing them. Both
