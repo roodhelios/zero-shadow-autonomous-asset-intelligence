@@ -38,11 +38,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     seal = commands.add_parser("create", help="create a detached HMAC manifest")
     seal.add_argument("snapshot", type=Path)
     seal.add_argument("--key-file", required=True, type=Path)
+    seal.add_argument("--key-id", required=True)
     seal.add_argument("--output", required=True, type=Path)
     verify = commands.add_parser("verify", help="verify a snapshot and its manifest")
     verify.add_argument("snapshot", type=Path)
     verify.add_argument("manifest", type=Path)
     verify.add_argument("--key-file", required=True, type=Path)
+    verify.add_argument("--key-id", required=True)
     args = parser.parse_args(argv)
     try:
         snapshot_path = _local(args.snapshot, "snapshot", exists=True)
@@ -55,7 +57,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 raise EvidenceAuthError("output must differ from snapshot and key file")
             if output.exists():
                 raise EvidenceAuthError("output already exists")
-            manifest = create_manifest(snapshot, key)
+            manifest = create_manifest(snapshot, key, key_id=args.key_id)
             output.write_text(
                 json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
             )
@@ -65,7 +67,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             if manifest_path in {snapshot_path, key_path}:
                 raise EvidenceAuthError("manifest must differ from snapshot and key file")
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            verify_manifest(snapshot, manifest, key)
+            verify_manifest(snapshot, manifest, key, expected_key_id=args.key_id)
             print(f"verified {manifest['asset_id']} {manifest['snapshot_sha256']}")
     except (EvidenceAuthError, OSError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
