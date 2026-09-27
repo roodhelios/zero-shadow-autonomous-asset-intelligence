@@ -88,6 +88,18 @@ useful for comparing two local exports. It does not authenticate the database or
 who produced the evidence. A trusted signature or independently retained digest would
 be needed to detect replacement of both the database and export.
 
+## Snapshot drift comparison
+
+`database/evidence_diff.py` verifies two exported digests before comparing them. Both
+snapshots must describe the same asset. Stable evidence identifiers separate added,
+removed, and modified observations, findings, ownership decisions, and remediation
+plans. Asset field changes are listed separately.
+
+The comparator is detached from discovery and persistence. It cannot open a database,
+contact a cloud account, or decide which snapshot is authoritative. A future production
+boundary would sign or independently anchor reviewed snapshot digests before using a
+diff for enforcement.
+
 ## Current limits
 
 - SQLite is the review and test dialect. A PostgreSQL migration needs separate syntax,
@@ -99,4 +111,5 @@ be needed to detect replacement of both the database and export.
   needed before treating task-instance retry behavior as verified.
 - Append-only triggers protect normal SQL statements, not an administrator who can
   replace the database file or alter the schema.
+- Snapshot digests expose changed files but do not authenticate the exporter.
 - No retention, encryption, backup, or access-control policy is implemented here.

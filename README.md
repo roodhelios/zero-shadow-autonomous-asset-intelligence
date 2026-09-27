@@ -156,6 +156,20 @@ finding fields still match their stored JSON evidence, requires a complete linke
 bundle, and adds a SHA-256 digest for comparing exports. The command opens SQLite in
 read-only mode and refuses to replace an existing output file.
 
+Two exported snapshots of the same asset can be compared without reopening either
+database:
+
+```bash
+python -m database.evidence_diff_cli base-snapshot.json current-snapshot.json \
+  --output asset-diff.json
+```
+
+The comparison verifies both snapshot digests before reading their evidence. It reports
+added, removed, and modified observation, finding, ownership, and remediation IDs plus
+changed asset fields. Different asset IDs, duplicate evidence IDs, an invalid digest,
+remote paths, and output replacement fail visibly. The result describes local evidence
+drift only. It does not discover assets or prove which snapshot is authoritative.
+
 The DAG passes its run ID to this boundary and allows one retry. Airflow is not
 installed in the validation environment, so the callable and import boundary are
 tested directly. The next step is to repeat the retry test in a disposable Airflow
