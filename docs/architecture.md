@@ -101,6 +101,12 @@ lets operators select a retained verification key during rotation without puttin
 material in the manifest. The key ID is a label, not a secret or trust decision. Old
 keys still need an explicit retirement and deletion procedure outside this repository.
 
+`database/evidence_keyring.py` validates non-secret lifecycle metadata separately from
+key bytes. Active keys can create or verify manifests only inside their stated window.
+Retired keys can verify existing manifests until `verify_until`, but cannot create new
+ones. The metadata does not load, store, encrypt, or delete secret material, and the
+caller must supply a trusted UTC time rather than accepting a timestamp from evidence.
+
 ## Snapshot drift comparison
 
 `database/evidence_diff.py` verifies two exported digests before comparing them. Both
