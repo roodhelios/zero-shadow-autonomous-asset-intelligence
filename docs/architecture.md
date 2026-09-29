@@ -85,8 +85,34 @@ than producing a partial asset view.
 
 The export includes a SHA-256 digest over the canonical snapshot body. That digest is
 useful for comparing two local exports. It does not authenticate the database or prove
-who produced the evidence. A trusted signature or independently retained digest would
-be needed to detect replacement of both the database and export.
+who produced the evidence. `database/evidence_auth.py` can create a detached
+HMAC-SHA256 manifest for independently stored snapshots. Verification checks the
+version, asset ID, and digest before comparing the manifest, and binds the MAC to both
+the asset ID and digest with a versioned domain prefix. The drift comparator remains
+responsible for validating the complete snapshot record shape.
+
+The HMAC key must remain outside the repository and exported evidence. HMAC provides
+shared-secret authentication only. Every verifier able to check the manifest also has
+the ability to create one, so the model does not provide non-repudiation or third-party
+verification without disclosing the key.
+
+Manifest version 2 includes a validated key ID inside the authenticated message. This
+lets operators select a retained verification key during rotation without putting key
+material in the manifest. The key ID is a label, not a secret or trust decision. Old
+keys still need an explicit retirement and deletion procedure outside this repository.
+
+## Snapshot drift comparison
+
+`database/evidence_diff.py` verifies two exported digests before comparing them. Both
+snapshots must describe the same asset. Stable evidence identifiers separate added,
+removed, and modified observations, findings, ownership decisions, and remediation
+plans. Asset field changes are listed separately.
+
+The comparator is detached from discovery and persistence. It cannot open a database,
+contact a cloud account, or decide which snapshot is authoritative. The detached HMAC
+manifest authenticates snapshots for holders of one shared secret. A future production
+boundary that needs independent verification should use a public-key signature or an
+independently controlled digest store before using a diff for enforcement.
 
 ## Current limits
 
@@ -99,4 +125,5 @@ be needed to detect replacement of both the database and export.
   needed before treating task-instance retry behavior as verified.
 - Append-only triggers protect normal SQL statements, not an administrator who can
   replace the database file or alter the schema.
+- Snapshot digests expose changed files but do not authenticate the exporter.
 - No retention, encryption, backup, or access-control policy is implemented here.

@@ -156,7 +156,41 @@ finding fields still match their stored JSON evidence, requires a complete linke
 bundle, and adds a SHA-256 digest for comparing exports. The command opens SQLite in
 read-only mode and refuses to replace an existing output file.
 
+Two exported snapshots of the same asset can be compared without reopening either
+database:
+
+```bash
+python -m database.evidence_diff_cli base-snapshot.json current-snapshot.json \
+  --output asset-diff.json
+```
+
+The comparison verifies both snapshot digests before reading their evidence. It reports
+added, removed, and modified observation, finding, ownership, and remediation IDs plus
+changed asset fields. Different asset IDs, duplicate evidence IDs, an invalid digest,
+remote paths, and output replacement fail visibly. The result describes local evidence
+drift only. It does not discover assets or prove which snapshot is authoritative.
+
 The DAG passes its run ID to this boundary and allows one retry. Airflow is not
 installed in the validation environment, so the callable and import boundary are
 tested directly. The next step is to repeat the retry test in a disposable Airflow
 installation and confirm the task-instance behavior.
+
+To authenticate an export across storage or transfer, create a detached HMAC-SHA256
+manifest with a key held separately from the snapshot:
+
+```bash
+python -c "import secrets; open('/secure/path/zero-shadow.key', 'xb').write(secrets.token_bytes(32))"
+chmod 600 /secure/path/zero-shadow.key
+python -m database.evidence_auth_cli create asset-evidence.json \
+  --key-file /secure/path/zero-shadow.key --output asset-evidence.auth.json
+python -m database.evidence_auth_cli verify asset-evidence.json \
+  asset-evidence.auth.json --key-file /secure/path/zero-shadow.key
+```
+
+The manifest authenticates the asset ID and validated snapshot digest. Keep the key
+outside the repository and evidence bundle. HMAC is symmetric: anyone with the key can
+create a valid manifest, so this does not provide non-repudiation or independent
+verification by a party that must not hold the key.
+On POSIX, the CLI refuses a key file readable or writable by group or other users.
+Restrict it to the owner, for example with `chmod 600`, before creating or verifying a
+manifest. Other operating systems may enforce key-file access through different ACLs.
