@@ -35,6 +35,51 @@ def snapshot() -> dict:
 
 
 class EvidenceAuthTests(unittest.TestCase):
+    def test_keyring_allows_active_create_and_retired_verify_only(self) -> None:
+        value = snapshot()
+        active = {
+            "schema_version": 1,
+            "keys": [{"key_id": "snapshot-key-2026-09", "state": "active",
+                      "activate_at": "2026-09-01T00:00:00Z",
+                      "verify_until": "2026-10-01T00:00:00Z"}],
+        }
+        manifest = create_manifest(
+            value, KEY, key_id="snapshot-key-2026-09", keyring=active,
+            at="2026-09-29T12:00:00Z",
+        )
+        retired = json.loads(json.dumps(active))
+        retired["keys"][0]["state"] = "retired"
+        verify_manifest(
+            value, manifest, KEY, expected_key_id="snapshot-key-2026-09",
+            keyring=retired, at="2026-09-29T12:00:00Z",
+        )
+        with self.assertRaisesRegex(EvidenceAuthError, "only an active key"):
+            create_manifest(
+                value, KEY, key_id="snapshot-key-2026-09", keyring=retired,
+                at="2026-09-29T12:00:00Z",
+            )
+
+    def test_keyring_expiry_unknown_key_and_missing_time_fail_closed(self) -> None:
+        value = snapshot()
+        ring = {"schema_version": 1, "keys": [{
+            "key_id": "snapshot-key-2026-09", "state": "retired",
+            "activate_at": "2026-09-01T00:00:00Z",
+            "verify_until": "2026-09-15T00:00:00Z",
+        }]}
+        for key_id, at, message in (
+            ("snapshot-key-2026-09", "2026-09-16T00:00:00Z", "outside its validity"),
+            ("snapshot-key-2026-10", "2026-09-10T00:00:00Z", "not in the keyring"),
+        ):
+            with self.subTest(message=message), self.assertRaisesRegex(EvidenceAuthError, message):
+                verify_manifest(
+                    value, {"schema_version": 2, "algorithm": "HMAC-SHA256",
+                            "key_id": key_id, "asset_id": "asset", "snapshot_sha256": "0" * 64,
+                            "hmac_sha256": "0" * 64}, KEY, expected_key_id=key_id,
+                    keyring=ring, at=at,
+                )
+        with self.assertRaisesRegex(EvidenceAuthError, "requires an operation and timestamp"):
+            create_manifest(value, KEY, key_id="snapshot-key-2026-09", keyring=ring)
+
     def test_manifest_authenticates_snapshot_and_is_deterministic(self) -> None:
         value = snapshot()
         manifest = create_manifest(value, KEY, key_id="snapshot-key-2026-09")
@@ -104,6 +149,44 @@ class EvidenceAuthTests(unittest.TestCase):
         self.assertEqual((create_status, verify_status, overwrite_status), (0, 0, 2))
         self.assertNotIn(KEY.decode("ascii"), manifest_text)
         self.assertIn("output already exists", errors.getvalue())
+
+    def test_cli_enforces_keyring_and_allows_retired_key_verification(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            snapshot_path = root / "snapshot.json"
+            key_path = root / "key.bin"
+            ring_path = root / "keyring.json"
+            manifest_path = root / "snapshot.auth.json"
+            snapshot_path.write_text(json.dumps(snapshot()), encoding="utf-8")
+            key_path.write_bytes(KEY)
+            key_path.chmod(0o600)
+            ring = {"schema_version": 1, "keys": [{
+                "key_id": "snapshot-key-2026-09", "state": "active",
+                "activate_at": "2026-09-01T00:00:00Z",
+                "verify_until": "2030-01-01T00:00:00Z",
+            }]}
+            ring_path.write_text(json.dumps(ring), encoding="utf-8")
+            with redirect_stdout(StringIO()):
+                created = main([
+                    "create", str(snapshot_path), "--key-file", str(key_path),
+                    "--key-id", "snapshot-key-2026-09", "--keyring", str(ring_path),
+                    "--output", str(manifest_path),
+                ])
+            ring["keys"][0]["state"] = "retired"
+            ring_path.write_text(json.dumps(ring), encoding="utf-8")
+            with redirect_stdout(StringIO()):
+                verified = main([
+                    "verify", str(snapshot_path), str(manifest_path),
+                    "--key-file", str(key_path), "--key-id", "snapshot-key-2026-09",
+                    "--keyring", str(ring_path),
+                ])
+            with redirect_stderr(StringIO()):
+                rejected = main([
+                    "create", str(snapshot_path), "--key-file", str(key_path),
+                    "--key-id", "snapshot-key-2026-09", "--keyring", str(ring_path),
+                    "--output", str(root / "second-manifest.json"),
+                ])
+        self.assertEqual((created, verified, rejected), (0, 0, 2))
 
     @unittest.skipUnless(os.name == "posix", "POSIX permission bits required")
     def test_cli_rejects_group_or_world_readable_key(self) -> None:
