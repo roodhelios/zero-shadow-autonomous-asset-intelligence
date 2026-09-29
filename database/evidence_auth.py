@@ -7,9 +7,10 @@ import hmac
 import json
 import re
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, Literal
 
 from .evidence_diff import EvidenceDiffError, compare_snapshots
+from .evidence_keyring import EvidenceKeyringError, authorize_key_use
 
 
 MANIFEST_FIELDS = {
@@ -50,10 +51,30 @@ def _message(key_id: str, asset_id: str, digest: str) -> bytes:
             + b"\x00" + bytes.fromhex(digest))
 
 
-def create_manifest(snapshot: Mapping[str, Any], key: bytes, *, key_id: str) -> dict[str, Any]:
+def _authorize(
+    keyring: Mapping[str, Any] | None, *, key_id: str,
+    operation: Literal["create", "verify"] | None, at: str | None,
+) -> None:
+    if keyring is None:
+        if operation is not None or at is not None:
+            raise EvidenceAuthError("operation and at require a keyring")
+        return
+    if operation is None or at is None:
+        raise EvidenceAuthError("keyring use requires an operation and timestamp")
+    try:
+        authorize_key_use(keyring, key_id=key_id, operation=operation, at=at)
+    except EvidenceKeyringError as exc:
+        raise EvidenceAuthError(f"key lifecycle rejected operation: {exc}") from exc
+
+
+def create_manifest(
+    snapshot: Mapping[str, Any], key: bytes, *, key_id: str,
+    keyring: Mapping[str, Any] | None = None, at: str | None = None,
+) -> dict[str, Any]:
     """Create an authentication manifest after validating the snapshot digest."""
     _key(key)
     normalized_key_id = _key_id(key_id)
+    _authorize(keyring, key_id=normalized_key_id, operation="create" if keyring is not None else None, at=at)
     try:
         compare_snapshots(snapshot, snapshot)
     except EvidenceDiffError as exc:
@@ -72,7 +93,8 @@ def create_manifest(snapshot: Mapping[str, Any], key: bytes, *, key_id: str) -> 
 
 
 def verify_manifest(
-    snapshot: Mapping[str, Any], manifest: Mapping[str, Any], key: bytes, *, expected_key_id: str
+    snapshot: Mapping[str, Any], manifest: Mapping[str, Any], key: bytes, *, expected_key_id: str,
+    keyring: Mapping[str, Any] | None = None, at: str | None = None,
 ) -> None:
     """Verify snapshot integrity and its separately retained HMAC manifest."""
     _key(key)
@@ -80,6 +102,7 @@ def verify_manifest(
         raise EvidenceAuthError("manifest must be an object")
     _fields(manifest)
     normalized_key_id = _key_id(expected_key_id)
+    _authorize(keyring, key_id=normalized_key_id, operation="verify" if keyring is not None else None, at=at)
     if manifest["key_id"] != normalized_key_id:
         raise EvidenceAuthError("manifest key_id does not match the selected key")
     if not isinstance(manifest["hmac_sha256"], str) or not HEX_SHA256.fullmatch(
