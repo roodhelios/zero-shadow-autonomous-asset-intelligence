@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "keys": [
+    {
+      "key_id": "snapshot-key-2026-09",
+      "state": "active",
+      "activate_at": "2026-09-01T00:00:00Z",
+      "verify_until": "2027-01-01T00:00:00Z"
+    },
+    {
+      "key_id": "snapshot-key-2026-08",
+      "state": "retired",
+      "activate_at": "2026-08-01T00:00:00Z",
+      "verify_until": "2026-10-01T00:00:00Z"
+    }
+  ]
+}
