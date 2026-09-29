@@ -194,3 +194,20 @@ verification by a party that must not hold the key.
 On POSIX, the CLI refuses a key file readable or writable by group or other users.
 Restrict it to the owner, for example with `chmod 600`, before creating or verifying a
 manifest. Other operating systems may enforce key-file access through different ACLs.
+
+To apply non-secret rotation metadata, pass a keyring document:
+
+```bash
+python -m database.evidence_auth_cli create asset-evidence.json \
+  --key-file /secure/path/zero-shadow.key --key-id snapshot-key-2026-09 \
+  --keyring examples/evidence-keyring-v1.json --output asset-evidence.auth.json
+python -m database.evidence_auth_cli verify asset-evidence.json \
+  asset-evidence.auth.json --key-file /secure/path/zero-shadow.key \
+  --key-id snapshot-key-2026-08 --keyring examples/evidence-keyring-v1.json
+```
+
+The CLI checks key validity using the local system clock. Active keys can create and
+verify during their configured window. Retired keys can verify until `verify_until`,
+but cannot create. The example keyring contains labels and dates only. Protect its
+integrity separately, keep key bytes out of it, and use a trusted system clock. A
+locally editable keyring is not an independent trust anchor.
