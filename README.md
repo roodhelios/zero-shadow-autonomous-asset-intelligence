@@ -211,3 +211,7 @@ verify during their configured window. Retired keys can verify until `verify_unt
 but cannot create. The example keyring contains labels and dates only. Protect its
 integrity separately, keep key bytes out of it, and use a trusted system clock. A
 locally editable keyring is not an independent trust anchor.
+On POSIX, the CLI refuses a keyring file with group or other write permission. Read
+permission is allowed because the keyring contains labels and dates, not key material.
+This only reduces shared-account modification. It does not protect against the file
+owner, root, or a process running as the same user.
