@@ -7,6 +7,7 @@ import json
 import os
 import stat
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Sequence
 
@@ -32,6 +33,18 @@ def _key(path: Path) -> bytes:
     return key
 
 
+def _keyring(path: Path | None) -> dict | None:
+    if path is None:
+        return None
+    resolved = _local(path, "keyring file", exists=True)
+    if not resolved.is_file() or resolved.stat().st_size > 1_048_576:
+        raise EvidenceAuthError("keyring must be a local file no larger than 1 MiB")
+    value = json.loads(resolved.read_text(encoding="utf-8"))
+    if not isinstance(value, dict):
+        raise EvidenceAuthError("keyring must be a JSON object")
+    return value
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Authenticate a local evidence snapshot")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -39,25 +52,32 @@ def main(argv: Sequence[str] | None = None) -> int:
     seal.add_argument("snapshot", type=Path)
     seal.add_argument("--key-file", required=True, type=Path)
     seal.add_argument("--key-id", required=True)
+    seal.add_argument("--keyring", type=Path, help="optional non-secret lifecycle metadata")
     seal.add_argument("--output", required=True, type=Path)
     verify = commands.add_parser("verify", help="verify a snapshot and its manifest")
     verify.add_argument("snapshot", type=Path)
     verify.add_argument("manifest", type=Path)
     verify.add_argument("--key-file", required=True, type=Path)
     verify.add_argument("--key-id", required=True)
+    verify.add_argument("--keyring", type=Path, help="optional non-secret lifecycle metadata")
     args = parser.parse_args(argv)
     try:
         snapshot_path = _local(args.snapshot, "snapshot", exists=True)
         key_path = _local(args.key_file, "key file", exists=True)
         snapshot = load_snapshot(snapshot_path)
         key = _key(key_path)
+        keyring = _keyring(args.keyring)
+        operation_time = (datetime.now(timezone.utc).replace(microsecond=0)
+                          .isoformat().replace("+00:00", "Z")) if keyring is not None else None
         if args.command == "create":
             output = _local(args.output, "output", exists=False)
             if output in {snapshot_path, key_path}:
                 raise EvidenceAuthError("output must differ from snapshot and key file")
             if output.exists():
                 raise EvidenceAuthError("output already exists")
-            manifest = create_manifest(snapshot, key, key_id=args.key_id)
+            manifest = create_manifest(
+                snapshot, key, key_id=args.key_id, keyring=keyring, at=operation_time
+            )
             output.write_text(
                 json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
             )
@@ -67,7 +87,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             if manifest_path in {snapshot_path, key_path}:
                 raise EvidenceAuthError("manifest must differ from snapshot and key file")
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            verify_manifest(snapshot, manifest, key, expected_key_id=args.key_id)
+            verify_manifest(
+                snapshot, manifest, key, expected_key_id=args.key_id,
+                keyring=keyring, at=operation_time,
+            )
             print(f"verified {manifest['asset_id']} {manifest['snapshot_sha256']}")
     except (EvidenceAuthError, OSError, json.JSONDecodeError) as exc:
         print(f"error: {exc}", file=sys.stderr)
