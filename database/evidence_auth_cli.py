@@ -39,6 +39,8 @@ def _keyring(path: Path | None) -> dict | None:
     resolved = _local(path, "keyring file", exists=True)
     if not resolved.is_file() or resolved.stat().st_size > 1_048_576:
         raise EvidenceAuthError("keyring must be a local file no larger than 1 MiB")
+    if os.name == "posix" and stat.S_IMODE(resolved.stat().st_mode) & 0o022:
+        raise EvidenceAuthError("keyring permissions must exclude group and other write access")
     value = json.loads(resolved.read_text(encoding="utf-8"))
     if not isinstance(value, dict):
         raise EvidenceAuthError("keyring must be a JSON object")
