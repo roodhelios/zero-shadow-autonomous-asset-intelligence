@@ -206,6 +206,51 @@ class EvidenceAuthTests(unittest.TestCase):
         self.assertEqual(status, 2)
         self.assertIn("permissions must exclude group and other", errors.getvalue())
 
+    @unittest.skipUnless(os.name == "posix", "POSIX permission bits required")
+    def test_cli_rejects_group_or_world_writable_keyring(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            snapshot_path = root / "snapshot.json"
+            key_path = root / "key.bin"
+            ring_path = root / "keyring.json"
+            snapshot_path.write_text(json.dumps(snapshot()), encoding="utf-8")
+            key_path.write_bytes(KEY)
+            key_path.chmod(0o600)
+            ring_path.write_text(json.dumps({"schema_version": 1, "keys": []}), encoding="utf-8")
+            ring_path.chmod(0o666)
+            errors = StringIO()
+            with redirect_stderr(errors):
+                status = main([
+                    "create", str(snapshot_path), "--key-file", str(key_path),
+                    "--key-id", "snapshot-key-2026-09", "--keyring", str(ring_path),
+                    "--output", str(root / "manifest.json"),
+                ])
+        self.assertEqual(status, 2)
+        self.assertIn("keyring permissions must exclude group and other write access", errors.getvalue())
+
+    def test_cli_rejects_duplicate_keyring_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ring_path = root / "keyring.json"
+            ring_path.write_text('{"schema_version":1,"schema_version":1,"keys":[]}', encoding="utf-8")
+            if os.name == "posix":
+                ring_path.chmod(0o600)
+            snapshot_path = root / "snapshot.json"
+            snapshot_path.write_text(json.dumps(snapshot()), encoding="utf-8")
+            key_path = root / "key.bin"
+            key_path.write_bytes(b"x" * 32)
+            if os.name == "posix":
+                key_path.chmod(0o600)
+            errors = StringIO()
+            with redirect_stderr(errors):
+                status = main([
+                    "verify", str(snapshot_path), str(root / "manifest.json"),
+                    "--key-file", str(key_path), "--key-id", "snapshot-key-2026-09",
+                    "--keyring", str(ring_path),
+                ])
+        self.assertEqual(status, 2)
+        self.assertIn("keyring contains duplicate JSON fields", errors.getvalue())
+
 
 if __name__ == "__main__":
     unittest.main()

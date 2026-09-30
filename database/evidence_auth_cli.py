@@ -39,7 +39,17 @@ def _keyring(path: Path | None) -> dict | None:
     resolved = _local(path, "keyring file", exists=True)
     if not resolved.is_file() or resolved.stat().st_size > 1_048_576:
         raise EvidenceAuthError("keyring must be a local file no larger than 1 MiB")
-    value = json.loads(resolved.read_text(encoding="utf-8"))
+    if os.name == "posix" and stat.S_IMODE(resolved.stat().st_mode) & 0o022:
+        raise EvidenceAuthError("keyring permissions must exclude group and other write access")
+    def unique_object(pairs: list[tuple[str, object]]) -> dict[str, object]:
+        result: dict[str, object] = {}
+        for key, item in pairs:
+            if key in result:
+                raise EvidenceAuthError("keyring contains duplicate JSON fields")
+            result[key] = item
+        return result
+
+    value = json.loads(resolved.read_text(encoding="utf-8"), object_pairs_hook=unique_object)
     if not isinstance(value, dict):
         raise EvidenceAuthError("keyring must be a JSON object")
     return value
