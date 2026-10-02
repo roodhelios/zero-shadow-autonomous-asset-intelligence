@@ -88,9 +88,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             manifest = create_manifest(
                 snapshot, key, key_id=args.key_id, keyring=keyring, at=operation_time
             )
-            output.write_text(
-                json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-            )
+            with output.open("x", encoding="utf-8") as handle:
+                handle.write(json.dumps(manifest, indent=2, sort_keys=True) + "\n")
             print(f"manifest created for {manifest['asset_id']}")
         else:
             manifest_path = _local(args.manifest, "manifest", exists=True)

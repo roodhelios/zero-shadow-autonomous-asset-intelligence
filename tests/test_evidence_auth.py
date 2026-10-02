@@ -6,6 +6,7 @@ import os
 import sqlite3
 import tempfile
 import unittest
+from unittest.mock import patch
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
@@ -250,6 +251,25 @@ class EvidenceAuthTests(unittest.TestCase):
                 ])
         self.assertEqual(status, 2)
         self.assertIn("keyring contains duplicate JSON fields", errors.getvalue())
+
+    def test_cli_does_not_replace_concurrently_created_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            snapshot_path = root / "snapshot.json"
+            snapshot_path.write_text(json.dumps(snapshot()), encoding="utf-8")
+            key_path = root / "key.bin"
+            key_path.write_bytes(KEY)
+            key_path.chmod(0o600)
+            output = root / "manifest.json"
+            def competing_writer(*args, **kwargs):
+                output.write_text("retained evidence", encoding="utf-8")
+                return {"asset_id": "synthetic"}
+            with patch("database.evidence_auth_cli.create_manifest", side_effect=competing_writer):
+                with redirect_stderr(StringIO()):
+                    result = main(["create", str(snapshot_path), "--key-file", str(key_path),
+                                   "--key-id", "test-key", "--output", str(output)])
+            self.assertEqual(result, 2)
+            self.assertEqual(output.read_text(), "retained evidence")
 
 
 if __name__ == "__main__":
