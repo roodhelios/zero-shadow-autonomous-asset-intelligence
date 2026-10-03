@@ -215,3 +215,5 @@ On POSIX, the CLI refuses a keyring file with group or other write permission. R
 permission is allowed because the keyring contains labels and dates, not key material.
 This only reduces shared-account modification. It does not protect against the file
 owner, root, or a process running as the same user.
+
+Detached manifests are created with exclusive file creation. If another process creates the output after the initial check, the CLI fails instead of replacing that evidence. The writer flushes and synchronizes the new file, then removes its own incomplete file if that step fails. This does not provide atomic visibility, authenticate the directory, or guarantee storage hardware durability.

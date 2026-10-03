@@ -55,6 +55,21 @@ def _keyring(path: Path | None) -> dict | None:
     return value
 
 
+def _write_new_json(path: Path, value: dict) -> None:
+    payload = json.dumps(value, indent=2, sort_keys=True) + "\n"
+    created = False
+    try:
+        with path.open("x", encoding="utf-8") as handle:
+            created = True
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+    except Exception:
+        if created:
+            path.unlink(missing_ok=True)
+        raise
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Authenticate a local evidence snapshot")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -88,9 +103,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             manifest = create_manifest(
                 snapshot, key, key_id=args.key_id, keyring=keyring, at=operation_time
             )
-            output.write_text(
-                json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-            )
+            _write_new_json(output, manifest)
             print(f"manifest created for {manifest['asset_id']}")
         else:
             manifest_path = _local(args.manifest, "manifest", exists=True)
