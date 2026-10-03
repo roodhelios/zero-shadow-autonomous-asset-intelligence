@@ -151,6 +151,30 @@ class EvidenceAuthTests(unittest.TestCase):
         self.assertNotIn(KEY.decode("ascii"), manifest_text)
         self.assertIn("output already exists", errors.getvalue())
 
+    def test_cli_removes_its_partial_manifest_after_flush_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            snapshot_path = root / "snapshot.json"
+            key_path = root / "key.bin"
+            manifest_path = root / "snapshot.auth.json"
+            snapshot_path.write_text(json.dumps(snapshot()), encoding="utf-8")
+            key_path.write_bytes(KEY)
+            key_path.chmod(0o600)
+            errors = StringIO()
+            with patch(
+                "database.evidence_auth_cli.os.fsync",
+                side_effect=OSError("synthetic sync failure"),
+            ), redirect_stderr(errors):
+                status = main([
+                    "create", str(snapshot_path), "--key-file", str(key_path),
+                    "--key-id", "snapshot-key-2026-09", "--output", str(manifest_path),
+                ])
+            manifest_exists = manifest_path.exists()
+
+        self.assertEqual(status, 2)
+        self.assertFalse(manifest_exists)
+        self.assertIn("synthetic sync failure", errors.getvalue())
+
     def test_cli_enforces_keyring_and_allows_retired_key_verification(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
