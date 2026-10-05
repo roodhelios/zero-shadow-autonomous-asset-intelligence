@@ -175,6 +175,37 @@ class EvidenceAuthTests(unittest.TestCase):
         self.assertFalse(manifest_exists)
         self.assertIn("synthetic sync failure", errors.getvalue())
 
+    def test_cli_publishes_only_a_complete_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            snapshot_path = root / "snapshot.json"
+            key_path = root / "key.bin"
+            manifest_path = root / "snapshot.auth.json"
+            snapshot_path.write_text(json.dumps(snapshot()), encoding="utf-8")
+            key_path.write_bytes(KEY)
+            key_path.chmod(0o600)
+            observed = {}
+            real_link = os.link
+
+            def inspect_before_publish(source, destination):
+                observed["output_exists"] = Path(destination).exists()
+                observed["temporary"] = json.loads(Path(source).read_text(encoding="utf-8"))
+                return real_link(source, destination)
+
+            with patch("database.evidence_auth_cli.os.link", side_effect=inspect_before_publish):
+                with redirect_stdout(StringIO()):
+                    status = main([
+                        "create", str(snapshot_path), "--key-file", str(key_path),
+                        "--key-id", "snapshot-key-2026-09", "--output", str(manifest_path),
+                    ])
+            saved = json.loads(manifest_path.read_text(encoding="utf-8"))
+            temporary_files = list(root.glob(".snapshot.auth.json.*.tmp"))
+
+        self.assertEqual(status, 0)
+        self.assertFalse(observed["output_exists"])
+        self.assertEqual(saved, observed["temporary"])
+        self.assertEqual(temporary_files, [])
+
     def test_cli_enforces_keyring_and_allows_retired_key_verification(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

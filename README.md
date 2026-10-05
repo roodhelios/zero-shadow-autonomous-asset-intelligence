@@ -216,4 +216,8 @@ permission is allowed because the keyring contains labels and dates, not key mat
 This only reduces shared-account modification. It does not protect against the file
 owner, root, or a process running as the same user.
 
-Detached manifests are created with exclusive file creation. If another process creates the output after the initial check, the CLI fails instead of replacing that evidence. The writer flushes and synchronizes the new file, then removes its own incomplete file if that step fails. This does not provide atomic visibility, authenticate the directory, or guarantee storage hardware durability.
+Detached manifests are written to a private temporary file in the destination directory,
+flushed, synchronized, and then published with a hard link that cannot replace an
+existing path. Readers therefore see either no output or complete JSON. Temporary files
+are removed after success or failure. The directory itself is not synchronized, so this
+does not guarantee survival after sudden storage or operating-system failure.
