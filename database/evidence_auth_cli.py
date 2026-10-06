@@ -73,9 +73,20 @@ def _write_new_json(path: Path, value: dict) -> None:
             handle.flush()
             os.fsync(handle.fileno())
         os.link(temporary_path, path)
+        _fsync_directory(path.parent)
     finally:
         if temporary_path is not None:
             temporary_path.unlink(missing_ok=True)
+
+
+def _fsync_directory(directory: Path) -> None:
+    """Synchronize the directory entry that publishes a completed manifest."""
+    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    descriptor = os.open(directory, flags)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
