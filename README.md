@@ -219,5 +219,8 @@ owner, root, or a process running as the same user.
 Detached manifests are written to a private temporary file in the destination directory,
 flushed, synchronized, and then published with a hard link that cannot replace an
 existing path. Readers therefore see either no output or complete JSON. Temporary files
-are removed after success or failure. The directory itself is not synchronized, so this
-does not guarantee survival after sudden storage or operating-system failure.
+are removed after success or failure. After publication, the destination directory is
+synchronized so the new name has an explicit durability boundary. If that final sync
+fails, the command reports an error but leaves the complete published manifest in place;
+the operator must inspect it before retrying. Actual crash guarantees still depend on the
+filesystem, mount options, storage controller, and operating system.
