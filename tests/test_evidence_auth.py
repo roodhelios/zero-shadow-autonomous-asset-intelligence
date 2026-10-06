@@ -6,6 +6,7 @@ import os
 import sqlite3
 import tempfile
 import unittest
+from unittest.mock import patch
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
@@ -150,6 +151,61 @@ class EvidenceAuthTests(unittest.TestCase):
         self.assertNotIn(KEY.decode("ascii"), manifest_text)
         self.assertIn("output already exists", errors.getvalue())
 
+    def test_cli_removes_its_partial_manifest_after_flush_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            snapshot_path = root / "snapshot.json"
+            key_path = root / "key.bin"
+            manifest_path = root / "snapshot.auth.json"
+            snapshot_path.write_text(json.dumps(snapshot()), encoding="utf-8")
+            key_path.write_bytes(KEY)
+            key_path.chmod(0o600)
+            errors = StringIO()
+            with patch(
+                "database.evidence_auth_cli.os.fsync",
+                side_effect=OSError("synthetic sync failure"),
+            ), redirect_stderr(errors):
+                status = main([
+                    "create", str(snapshot_path), "--key-file", str(key_path),
+                    "--key-id", "snapshot-key-2026-09", "--output", str(manifest_path),
+                ])
+            manifest_exists = manifest_path.exists()
+
+        self.assertEqual(status, 2)
+        self.assertFalse(manifest_exists)
+        self.assertIn("synthetic sync failure", errors.getvalue())
+
+    def test_cli_publishes_only_a_complete_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            snapshot_path = root / "snapshot.json"
+            key_path = root / "key.bin"
+            manifest_path = root / "snapshot.auth.json"
+            snapshot_path.write_text(json.dumps(snapshot()), encoding="utf-8")
+            key_path.write_bytes(KEY)
+            key_path.chmod(0o600)
+            observed = {}
+            real_link = os.link
+
+            def inspect_before_publish(source, destination):
+                observed["output_exists"] = Path(destination).exists()
+                observed["temporary"] = json.loads(Path(source).read_text(encoding="utf-8"))
+                return real_link(source, destination)
+
+            with patch("database.evidence_auth_cli.os.link", side_effect=inspect_before_publish):
+                with redirect_stdout(StringIO()):
+                    status = main([
+                        "create", str(snapshot_path), "--key-file", str(key_path),
+                        "--key-id", "snapshot-key-2026-09", "--output", str(manifest_path),
+                    ])
+            saved = json.loads(manifest_path.read_text(encoding="utf-8"))
+            temporary_files = list(root.glob(".snapshot.auth.json.*.tmp"))
+
+        self.assertEqual(status, 0)
+        self.assertFalse(observed["output_exists"])
+        self.assertEqual(saved, observed["temporary"])
+        self.assertEqual(temporary_files, [])
+
     def test_cli_enforces_keyring_and_allows_retired_key_verification(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -250,6 +306,25 @@ class EvidenceAuthTests(unittest.TestCase):
                 ])
         self.assertEqual(status, 2)
         self.assertIn("keyring contains duplicate JSON fields", errors.getvalue())
+
+    def test_cli_does_not_replace_concurrently_created_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            snapshot_path = root / "snapshot.json"
+            snapshot_path.write_text(json.dumps(snapshot()), encoding="utf-8")
+            key_path = root / "key.bin"
+            key_path.write_bytes(KEY)
+            key_path.chmod(0o600)
+            output = root / "manifest.json"
+            def competing_writer(*args, **kwargs):
+                output.write_text("retained evidence", encoding="utf-8")
+                return {"asset_id": "synthetic"}
+            with patch("database.evidence_auth_cli.create_manifest", side_effect=competing_writer):
+                with redirect_stderr(StringIO()):
+                    result = main(["create", str(snapshot_path), "--key-file", str(key_path),
+                                   "--key-id", "test-key", "--output", str(output)])
+            self.assertEqual(result, 2)
+            self.assertEqual(output.read_text(), "retained evidence")
 
 
 if __name__ == "__main__":

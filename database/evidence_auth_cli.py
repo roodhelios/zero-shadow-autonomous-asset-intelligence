@@ -7,6 +7,7 @@ import json
 import os
 import stat
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Sequence
@@ -55,6 +56,28 @@ def _keyring(path: Path | None) -> dict | None:
     return value
 
 
+def _write_new_json(path: Path, value: dict) -> None:
+    payload = json.dumps(value, indent=2, sort_keys=True) + "\n"
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=path.parent,
+            prefix=f".{path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            temporary_path = Path(handle.name)
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.link(temporary_path, path)
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Authenticate a local evidence snapshot")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -88,9 +111,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             manifest = create_manifest(
                 snapshot, key, key_id=args.key_id, keyring=keyring, at=operation_time
             )
-            output.write_text(
-                json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-            )
+            _write_new_json(output, manifest)
             print(f"manifest created for {manifest['asset_id']}")
         else:
             manifest_path = _local(args.manifest, "manifest", exists=True)
