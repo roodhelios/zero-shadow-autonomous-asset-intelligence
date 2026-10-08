@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import json
 import os
 import secrets
@@ -22,6 +23,7 @@ class StorageProbeResult:
     exclusive_create: bool
     file_sync: bool
     hard_link_publish: bool
+    no_replace_collision: bool
     directory_sync: bool
 
     def to_dict(self) -> dict[str, object]:
@@ -31,6 +33,7 @@ class StorageProbeResult:
             "exclusive_create": self.exclusive_create,
             "file_sync": self.file_sync,
             "hard_link_publish": self.hard_link_publish,
+            "no_replace_collision": self.no_replace_collision,
             "directory_sync": self.directory_sync,
             "status": "supported",
         }
@@ -47,6 +50,7 @@ def probe_storage_directory(directory: Path) -> StorageProbeResult:
 
     token = secrets.token_hex(16)
     temporary = target / f".zero-shadow-probe-{token}.tmp"
+    competitor = target / f".zero-shadow-probe-{token}.competitor"
     published = target / f".zero-shadow-probe-{token}.published"
     descriptor: int | None = None
     directory_descriptor: int | None = None
@@ -62,11 +66,33 @@ def probe_storage_directory(directory: Path) -> StorageProbeResult:
         descriptor = None
 
         os.link(temporary, published)
+
+        competitor_descriptor = os.open(
+            competitor,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+            0o600,
+        )
+        try:
+            os.write(competitor_descriptor, b"replacement-must-not-publish\n")
+            os.fsync(competitor_descriptor)
+        finally:
+            os.close(competitor_descriptor)
+        try:
+            os.link(competitor, published)
+        except OSError as exc:
+            if exc.errno != errno.EEXIST:
+                raise
+        else:
+            raise StorageProbeError("storage publication replaced an existing artifact")
+        if published.read_bytes() != b"zero-shadow-storage-probe\n":
+            raise StorageProbeError("storage publication changed during collision testing")
+
         flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
         directory_descriptor = os.open(target, flags)
         os.fsync(directory_descriptor)
 
         published.unlink()
+        competitor.unlink()
         temporary.unlink()
         os.fsync(directory_descriptor)
     except OSError as exc:
@@ -78,7 +104,7 @@ def probe_storage_directory(directory: Path) -> StorageProbeResult:
             os.close(descriptor)
         if directory_descriptor is not None:
             os.close(directory_descriptor)
-        for path in (published, temporary):
+        for path in (published, competitor, temporary):
             try:
                 path.unlink()
             except FileNotFoundError:
@@ -86,7 +112,7 @@ def probe_storage_directory(directory: Path) -> StorageProbeResult:
             except OSError:
                 pass
 
-    return StorageProbeResult(str(target), True, True, True, True)
+    return StorageProbeResult(str(target), True, True, True, True, True)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
