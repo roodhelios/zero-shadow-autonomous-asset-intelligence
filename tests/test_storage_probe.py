@@ -21,6 +21,7 @@ class StorageProbeTests(unittest.TestCase):
         self.assertTrue(result.exclusive_create)
         self.assertTrue(result.file_sync)
         self.assertTrue(result.hard_link_publish)
+        self.assertTrue(result.no_replace_collision)
         self.assertTrue(result.directory_sync)
         self.assertEqual(remaining, [])
 
@@ -29,6 +30,26 @@ class StorageProbeTests(unittest.TestCase):
             root = Path(directory)
             with patch("database.storage_probe.os.link", side_effect=OSError("unsupported")):
                 with self.assertRaisesRegex(StorageProbeError, "publication primitive"):
+                    probe_storage_directory(root)
+            remaining = list(root.iterdir())
+        self.assertEqual(remaining, [])
+
+    def test_collision_must_fail_with_file_exists(self) -> None:
+        real_link = __import__("os").link
+        calls = 0
+
+        def unsafe_link(source, destination):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                return real_link(source, destination)
+            Path(destination).unlink()
+            return real_link(source, destination)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch("database.storage_probe.os.link", side_effect=unsafe_link):
+                with self.assertRaisesRegex(StorageProbeError, "replaced"):
                     probe_storage_directory(root)
             remaining = list(root.iterdir())
         self.assertEqual(remaining, [])
@@ -52,6 +73,7 @@ class StorageProbeTests(unittest.TestCase):
         self.assertEqual(status, 0)
         self.assertEqual(result["status"], "supported")
         self.assertTrue(result["directory_sync"])
+        self.assertTrue(result["no_replace_collision"])
 
     def test_cli_rejects_missing_directory(self) -> None:
         errors = io.StringIO()
