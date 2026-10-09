@@ -224,3 +224,24 @@ synchronized so the new name has an explicit durability boundary. If that final 
 fails, the command reports an error but leaves the complete published manifest in place;
 the operator must inspect it before retrying. Actual crash guarantees still depend on the
 filesystem, mount options, storage controller, and operating system.
+
+Before selecting an evidence directory, probe the exact mounted path used by the
+deployment:
+
+```bash
+python -m database.storage_probe /path/to/evidence-directory
+```
+
+The probe creates two private temporary names, exercises exclusive creation, file
+synchronization, hard-link publication, and directory synchronization, then removes
+the probe files. It also attempts a second publication to the same name and requires
+an `EEXIST` collision while confirming the first artifact remains unchanged. This
+checks the no-replace assumption used by detached evidence manifests on that storage.
+Cleanup synchronizes the directory and retains no evidence. The probe performs no
+network activity. A successful result confirms that the current runtime and mounted path expose
+the required primitives. It does not prove behavior during power loss or storage
+controller failure, so deployment-specific crash testing is still required.
+
+The storage probe completes partial writes and retries interrupted writes before
+synchronizing either temporary artifact. A write that makes no progress fails and
+cleans up instead of reporting supported storage. This is not a crash simulation.
