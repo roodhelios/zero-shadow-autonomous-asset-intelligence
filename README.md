@@ -234,7 +234,10 @@ python -m database.storage_probe /path/to/evidence-directory
 
 The probe creates two private temporary names, exercises exclusive creation, file
 synchronization, hard-link publication, and directory synchronization, then removes
-both names and synchronizes the cleanup. It retains no evidence and performs no network
-activity. A successful result confirms that the current runtime and mounted path expose
+the probe files. It also attempts a second publication to the same name and requires
+an `EEXIST` collision while confirming the first artifact remains unchanged. This
+checks the no-replace assumption used by detached evidence manifests on that storage.
+Cleanup synchronizes the directory and retains no evidence. The probe performs no
+network activity. A successful result confirms that the current runtime and mounted path expose
 the required primitives. It does not prove behavior during power loss or storage
 controller failure, so deployment-specific crash testing is still required.
