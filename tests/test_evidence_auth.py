@@ -206,6 +206,32 @@ class EvidenceAuthTests(unittest.TestCase):
         self.assertEqual(saved, observed["temporary"])
         self.assertEqual(temporary_files, [])
 
+    def test_cli_reports_directory_sync_failure_after_complete_publication(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            snapshot_path = root / "snapshot.json"
+            key_path = root / "key.bin"
+            manifest_path = root / "snapshot.auth.json"
+            snapshot_path.write_text(json.dumps(snapshot()), encoding="utf-8")
+            key_path.write_bytes(KEY)
+            key_path.chmod(0o600)
+            errors = StringIO()
+            with patch(
+                "database.evidence_auth_cli.os.fsync",
+                side_effect=[None, OSError("synthetic directory sync failure")],
+            ), redirect_stderr(errors):
+                status = main([
+                    "create", str(snapshot_path), "--key-file", str(key_path),
+                    "--key-id", "snapshot-key-2026-09", "--output", str(manifest_path),
+                ])
+            saved = json.loads(manifest_path.read_text(encoding="utf-8"))
+            temporary_files = list(root.glob(".snapshot.auth.json.*.tmp"))
+
+        self.assertEqual(status, 2)
+        self.assertEqual(saved["asset_id"], snapshot()["asset"]["asset_id"])
+        self.assertEqual(temporary_files, [])
+        self.assertIn("synthetic directory sync failure", errors.getvalue())
+
     def test_cli_enforces_keyring_and_allows_retired_key_verification(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
