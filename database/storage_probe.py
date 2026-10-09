@@ -39,6 +39,19 @@ class StorageProbeResult:
         }
 
 
+def _write_all(descriptor: int, payload: bytes) -> None:
+    """Require all probe bytes to reach the descriptor before synchronization."""
+    remaining = memoryview(payload)
+    while remaining:
+        try:
+            written = os.write(descriptor, remaining)
+        except InterruptedError:
+            continue
+        if written <= 0:
+            raise StorageProbeError("storage probe write made no progress")
+        remaining = remaining[written:]
+
+
 def probe_storage_directory(directory: Path) -> StorageProbeResult:
     """Exercise the primitives used to publish complete detached manifests."""
     try:
@@ -60,7 +73,7 @@ def probe_storage_directory(directory: Path) -> StorageProbeResult:
             os.O_WRONLY | os.O_CREAT | os.O_EXCL,
             0o600,
         )
-        os.write(descriptor, b"zero-shadow-storage-probe\n")
+        _write_all(descriptor, b"zero-shadow-storage-probe\n")
         os.fsync(descriptor)
         os.close(descriptor)
         descriptor = None
@@ -73,7 +86,7 @@ def probe_storage_directory(directory: Path) -> StorageProbeResult:
             0o600,
         )
         try:
-            os.write(competitor_descriptor, b"replacement-must-not-publish\n")
+            _write_all(competitor_descriptor, b"replacement-must-not-publish\n")
             os.fsync(competitor_descriptor)
         finally:
             os.close(competitor_descriptor)

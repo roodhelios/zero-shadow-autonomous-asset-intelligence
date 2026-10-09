@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import json
+import os
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
@@ -53,6 +54,32 @@ class StorageProbeTests(unittest.TestCase):
                     probe_storage_directory(root)
             remaining = list(root.iterdir())
         self.assertEqual(remaining, [])
+
+    def test_short_writes_and_interruptions_are_completed(self) -> None:
+        real_write = os.write
+        calls = 0
+
+        def short_write(descriptor, payload):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise InterruptedError("synthetic interruption")
+            return real_write(descriptor, payload[:3])
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch("database.storage_probe.os.write", side_effect=short_write):
+                self.assertTrue(probe_storage_directory(root).no_replace_collision)
+            self.assertEqual(list(root.iterdir()), [])
+        self.assertGreater(calls, 3)
+
+    def test_stalled_write_fails_and_cleans_files(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch("database.storage_probe.os.write", return_value=0):
+                with self.assertRaisesRegex(StorageProbeError, "no progress"):
+                    probe_storage_directory(root)
+            self.assertEqual(list(root.iterdir()), [])
 
     def test_symlink_directory_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

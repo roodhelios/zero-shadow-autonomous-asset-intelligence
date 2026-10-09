@@ -241,3 +241,7 @@ Cleanup synchronizes the directory and retains no evidence. The probe performs n
 network activity. A successful result confirms that the current runtime and mounted path expose
 the required primitives. It does not prove behavior during power loss or storage
 controller failure, so deployment-specific crash testing is still required.
+
+The storage probe completes partial writes and retries interrupted writes before
+synchronizing either temporary artifact. A write that makes no progress fails and
+cleans up instead of reporting supported storage. This is not a crash simulation.
