@@ -245,3 +245,8 @@ controller failure, so deployment-specific crash testing is still required.
 The storage probe completes partial writes and retries interrupted writes before
 synchronizing either temporary artifact. A write that makes no progress fails and
 cleans up instead of reporting supported storage. This is not a crash simulation.
+
+On POSIX, the probe reports the directory mode and whether group and other permission
+bits are absent. Add `--require-private` to reject a shared evidence directory before
+creating probe files. This is a deployment check, not a claim that mode bits alone
+prove ownership, mount isolation, or protection from privileged users.

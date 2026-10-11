@@ -101,6 +101,29 @@ class StorageProbeTests(unittest.TestCase):
         self.assertEqual(result["status"], "supported")
         self.assertTrue(result["directory_sync"])
         self.assertTrue(result["no_replace_collision"])
+        if os.name == "posix":
+            self.assertEqual(result["directory_mode"], "0700")
+            self.assertTrue(result["private_directory"])
+
+    @unittest.skipUnless(os.name == "posix", "POSIX permission contract")
+    def test_require_private_rejects_group_access_before_writing(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            root.chmod(0o750)
+            with self.assertRaisesRegex(StorageProbeError, "group and other"):
+                probe_storage_directory(root, require_private=True)
+            self.assertEqual(list(root.iterdir()), [])
+
+    @unittest.skipUnless(os.name == "posix", "POSIX permission contract")
+    def test_cli_require_private_reports_fixed_error(self) -> None:
+        errors = io.StringIO()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            root.chmod(0o707)
+            with redirect_stderr(errors):
+                status = main([str(root), "--require-private"])
+        self.assertEqual(status, 2)
+        self.assertIn("group and other", errors.getvalue())
 
     def test_cli_rejects_missing_directory(self) -> None:
         errors = io.StringIO()

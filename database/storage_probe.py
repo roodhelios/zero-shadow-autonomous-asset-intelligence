@@ -7,6 +7,7 @@ import errno
 import json
 import os
 import secrets
+import stat
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,6 +21,8 @@ class StorageProbeError(ValueError):
 @dataclass(frozen=True, slots=True)
 class StorageProbeResult:
     directory: str
+    directory_mode: str | None
+    private_directory: bool | None
     exclusive_create: bool
     file_sync: bool
     hard_link_publish: bool
@@ -30,6 +33,8 @@ class StorageProbeResult:
         return {
             "schema_version": 1,
             "directory": self.directory,
+            "directory_mode": self.directory_mode,
+            "private_directory": self.private_directory,
             "exclusive_create": self.exclusive_create,
             "file_sync": self.file_sync,
             "hard_link_publish": self.hard_link_publish,
@@ -52,7 +57,9 @@ def _write_all(descriptor: int, payload: bytes) -> None:
         remaining = remaining[written:]
 
 
-def probe_storage_directory(directory: Path) -> StorageProbeResult:
+def probe_storage_directory(
+    directory: Path, *, require_private: bool = False
+) -> StorageProbeResult:
     """Exercise the primitives used to publish complete detached manifests."""
     try:
         target = directory.resolve(strict=True)
@@ -60,6 +67,16 @@ def probe_storage_directory(directory: Path) -> StorageProbeResult:
         raise StorageProbeError("storage directory does not exist") from exc
     if not target.is_dir() or directory.is_symlink():
         raise StorageProbeError("storage target must be a non-symlink directory")
+    directory_mode: str | None = None
+    private_directory: bool | None = None
+    if os.name == "posix":
+        mode = stat.S_IMODE(target.stat().st_mode)
+        directory_mode = f"{mode:04o}"
+        private_directory = mode & 0o077 == 0
+        if require_private and not private_directory:
+            raise StorageProbeError(
+                "storage directory must exclude group and other permissions"
+            )
 
     token = secrets.token_hex(16)
     temporary = target / f".zero-shadow-probe-{token}.tmp"
@@ -125,15 +142,24 @@ def probe_storage_directory(directory: Path) -> StorageProbeResult:
             except OSError:
                 pass
 
-    return StorageProbeResult(str(target), True, True, True, True, True)
+    return StorageProbeResult(
+        str(target), directory_mode, private_directory, True, True, True, True, True
+    )
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("directory", type=Path)
+    parser.add_argument(
+        "--require-private",
+        action="store_true",
+        help="reject a POSIX directory with group or other permissions",
+    )
     args = parser.parse_args(argv)
     try:
-        result = probe_storage_directory(args.directory)
+        result = probe_storage_directory(
+            args.directory, require_private=args.require_private
+        )
     except StorageProbeError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
