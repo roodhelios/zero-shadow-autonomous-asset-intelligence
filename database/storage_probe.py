@@ -23,6 +23,8 @@ class StorageProbeResult:
     directory: str
     directory_mode: str | None
     private_directory: bool | None
+    directory_owner_uid: int | None
+    owner_matches: bool | None
     exclusive_create: bool
     file_sync: bool
     hard_link_publish: bool
@@ -35,6 +37,8 @@ class StorageProbeResult:
             "directory": self.directory,
             "directory_mode": self.directory_mode,
             "private_directory": self.private_directory,
+            "directory_owner_uid": self.directory_owner_uid,
+            "owner_matches": self.owner_matches,
             "exclusive_create": self.exclusive_create,
             "file_sync": self.file_sync,
             "hard_link_publish": self.hard_link_publish,
@@ -58,7 +62,10 @@ def _write_all(descriptor: int, payload: bytes) -> None:
 
 
 def probe_storage_directory(
-    directory: Path, *, require_private: bool = False
+    directory: Path,
+    *,
+    require_private: bool = False,
+    expected_owner_uid: int | None = None,
 ) -> StorageProbeResult:
     """Exercise the primitives used to publish complete detached manifests."""
     try:
@@ -69,14 +76,31 @@ def probe_storage_directory(
         raise StorageProbeError("storage target must be a non-symlink directory")
     directory_mode: str | None = None
     private_directory: bool | None = None
+    directory_owner_uid: int | None = None
+    owner_matches: bool | None = None
+    if expected_owner_uid is not None and (
+        type(expected_owner_uid) is not int or expected_owner_uid < 0
+    ):
+        raise StorageProbeError("expected owner UID must be a nonnegative integer")
     if os.name == "posix":
-        mode = stat.S_IMODE(target.stat().st_mode)
+        metadata = target.stat()
+        mode = stat.S_IMODE(metadata.st_mode)
         directory_mode = f"{mode:04o}"
         private_directory = mode & 0o077 == 0
+        directory_owner_uid = metadata.st_uid
+        owner_matches = (
+            None
+            if expected_owner_uid is None
+            else directory_owner_uid == expected_owner_uid
+        )
         if require_private and not private_directory:
             raise StorageProbeError(
                 "storage directory must exclude group and other permissions"
             )
+        if owner_matches is False:
+            raise StorageProbeError("storage directory owner does not match expected UID")
+    elif expected_owner_uid is not None:
+        raise StorageProbeError("storage directory owner checks require POSIX")
 
     token = secrets.token_hex(16)
     temporary = target / f".zero-shadow-probe-{token}.tmp"
@@ -143,7 +167,16 @@ def probe_storage_directory(
                 pass
 
     return StorageProbeResult(
-        str(target), directory_mode, private_directory, True, True, True, True, True
+        str(target),
+        directory_mode,
+        private_directory,
+        directory_owner_uid,
+        owner_matches,
+        True,
+        True,
+        True,
+        True,
+        True,
     )
 
 
@@ -155,10 +188,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="reject a POSIX directory with group or other permissions",
     )
+    parser.add_argument(
+        "--expected-owner-uid",
+        type=int,
+        help="reject a POSIX directory not owned by this numeric user ID",
+    )
     args = parser.parse_args(argv)
     try:
         result = probe_storage_directory(
-            args.directory, require_private=args.require_private
+            args.directory,
+            require_private=args.require_private,
+            expected_owner_uid=args.expected_owner_uid,
         )
     except StorageProbeError as exc:
         print(f"error: {exc}", file=sys.stderr)
