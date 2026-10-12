@@ -250,3 +250,7 @@ On POSIX, the probe reports the directory mode and whether group and other permi
 bits are absent. Add `--require-private` to reject a shared evidence directory before
 creating probe files. This is a deployment check, not a claim that mode bits alone
 prove ownership, mount isolation, or protection from privileged users.
+
+Add `--expected-owner-uid` to reject a POSIX evidence directory owned by a
+different numeric user ID before creating probe files. UID equality does not evaluate
+user namespaces, access control lists, or permissions on parent paths.

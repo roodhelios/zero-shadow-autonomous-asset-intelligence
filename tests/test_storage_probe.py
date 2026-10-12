@@ -104,6 +104,8 @@ class StorageProbeTests(unittest.TestCase):
         if os.name == "posix":
             self.assertEqual(result["directory_mode"], "0700")
             self.assertTrue(result["private_directory"])
+            self.assertEqual(result["directory_owner_uid"], os.getuid())
+            self.assertIsNone(result["owner_matches"])
 
     @unittest.skipUnless(os.name == "posix", "POSIX permission contract")
     def test_require_private_rejects_group_access_before_writing(self) -> None:
@@ -124,6 +126,31 @@ class StorageProbeTests(unittest.TestCase):
                 status = main([str(root), "--require-private"])
         self.assertEqual(status, 2)
         self.assertIn("group and other", errors.getvalue())
+
+    @unittest.skipUnless(os.name == "posix", "POSIX owner contract")
+    def test_expected_owner_uid_is_reported_and_enforced_before_writing(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            result = probe_storage_directory(
+                root, expected_owner_uid=os.getuid()
+            )
+            self.assertEqual(result.directory_owner_uid, os.getuid())
+            self.assertTrue(result.owner_matches)
+            with self.assertRaisesRegex(StorageProbeError, "owner"):
+                probe_storage_directory(
+                    root, expected_owner_uid=os.getuid() + 1
+                )
+            self.assertEqual(list(root.iterdir()), [])
+
+    def test_expected_owner_uid_must_be_nonnegative_integer(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            for value in (-1, True, 1.5, "1"):
+                with self.subTest(value=value), self.assertRaisesRegex(
+                    StorageProbeError, "nonnegative integer"
+                ):
+                    probe_storage_directory(
+                        Path(directory), expected_owner_uid=value
+                    )
 
     def test_cli_rejects_missing_directory(self) -> None:
         errors = io.StringIO()
