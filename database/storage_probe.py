@@ -82,6 +82,8 @@ def probe_storage_directory(
         type(expected_owner_uid) is not int or expected_owner_uid < 0
     ):
         raise StorageProbeError("expected owner UID must be a nonnegative integer")
+    if require_private and os.name != "posix":
+        raise StorageProbeError("private storage permission checks require POSIX")
     if os.name == "posix":
         metadata = target.stat()
         mode = stat.S_IMODE(metadata.st_mode)
