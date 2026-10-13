@@ -1,5 +1,9 @@
 # Zero Shadow Autonomous Asset Intelligence
 
+The storage probe refuses `--require-private` on platforms without POSIX permission
+checks instead of silently reporting success. This policy remains opt-in and does not
+evaluate access control lists or parent-directory trust.
+
 Zero Shadow is being built as a local-first asset inventory and risk explanation
 project. The repository began as a directory skeleton. Features are marked as working
 only after code and deterministic tests exist.
