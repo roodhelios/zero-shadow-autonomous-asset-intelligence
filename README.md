@@ -1,5 +1,14 @@
 # Zero Shadow Autonomous Asset Intelligence
 
+Key lifecycle authorization rejects malformed state and operation types, non-integer
+schema versions, oversized timestamps, and UTC conversion overflow with the keyring
+validation error. Validity windows still use an inclusive activation time and an
+exclusive verification deadline. This validates metadata, not secret-key storage.
+
+The storage probe refuses `--require-private` on platforms without POSIX permission
+checks instead of silently reporting success. This policy remains opt-in and does not
+evaluate access control lists or parent-directory trust.
+
 Zero Shadow is being built as a local-first asset inventory and risk explanation
 project. The repository began as a directory skeleton. Features are marked as working
 only after code and deterministic tests exist.

@@ -13,6 +13,14 @@ from database.storage_probe import StorageProbeError, main, probe_storage_direct
 
 
 class StorageProbeTests(unittest.TestCase):
+    def test_private_policy_fails_on_platform_without_posix_permissions(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch("database.storage_probe.os.name", "unsupported"):
+                with self.assertRaisesRegex(StorageProbeError, "require POSIX"):
+                    probe_storage_directory(root, require_private=True)
+            self.assertEqual(list(root.iterdir()), [])
+
     def test_probe_exercises_and_cleans_publication_files(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

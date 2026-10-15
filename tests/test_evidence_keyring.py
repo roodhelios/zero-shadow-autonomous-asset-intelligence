@@ -14,6 +14,33 @@ def keyring(state="active"):
 
 
 class EvidenceKeyringTests(unittest.TestCase):
+    def test_malformed_metadata_is_a_keyring_validation_error(self):
+        for version in (True, 1.0, "1"):
+            value = keyring()
+            value["schema_version"] = version
+            with self.subTest(version=version), self.assertRaises(EvidenceKeyringError):
+                authorize_key_use(value, key_id="snapshot-key-2026-09",
+                    operation="verify", at="2026-10-15T12:00:00Z")
+        for invalid in ([], {}, None, True):
+            with self.subTest(state=invalid), self.assertRaises(EvidenceKeyringError):
+                authorize_key_use(keyring(invalid), key_id="snapshot-key-2026-09",
+                    operation="verify", at="2026-10-15T12:00:00Z")
+            with self.subTest(operation=invalid), self.assertRaises(EvidenceKeyringError):
+                authorize_key_use(keyring(), key_id="snapshot-key-2026-09",
+                    operation=invalid, at="2026-10-15T12:00:00Z")
+
+    def test_timestamp_overflow_is_contained_for_every_window_field(self):
+        for field in ("at", "activate_at", "verify_until"):
+            for timestamp in ("0001-01-01T00:00:00+01:00", "9999-12-31T23:59:59-01:00", "x" * 65):
+                value = keyring()
+                at = "2026-10-15T12:00:00Z"
+                if field == "at":
+                    at = timestamp
+                else:
+                    value["keys"][0][field] = timestamp
+                with self.subTest(field=field, timestamp=timestamp), self.assertRaises(EvidenceKeyringError):
+                    authorize_key_use(value, key_id="snapshot-key-2026-09", operation="verify", at=at)
+
     def test_active_key_can_create_and_verify_inside_window(self):
         for operation in ("create", "verify"):
             authorize_key_use(keyring(), key_id="snapshot-key-2026-09",
