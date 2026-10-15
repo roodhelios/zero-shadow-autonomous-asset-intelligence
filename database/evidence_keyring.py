@@ -12,7 +12,7 @@ class EvidenceKeyringError(ValueError):
 
 
 def _time(value: Any, field: str) -> datetime:
-    if not isinstance(value, str):
+    if not isinstance(value, str) or len(value) > 64:
         raise EvidenceKeyringError(f"{field} must be an ISO 8601 string")
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -20,7 +20,10 @@ def _time(value: Any, field: str) -> datetime:
         raise EvidenceKeyringError(f"{field} must be an ISO 8601 string") from exc
     if parsed.tzinfo is None:
         raise EvidenceKeyringError(f"{field} must include a UTC offset")
-    return parsed.astimezone(timezone.utc)
+    try:
+        return parsed.astimezone(timezone.utc)
+    except (OverflowError, ValueError) as exc:
+        raise EvidenceKeyringError(f"{field} is outside the supported UTC range") from exc
 
 
 def authorize_key_use(
@@ -30,9 +33,9 @@ def authorize_key_use(
     """Authorize create or verify from metadata that contains no key material."""
     if not isinstance(value, Mapping) or set(value) != {"schema_version", "keys"}:
         raise EvidenceKeyringError("keyring must contain schema_version and keys")
-    if value["schema_version"] != 1:
+    if type(value["schema_version"]) is not int or value["schema_version"] != 1:
         raise EvidenceKeyringError("keyring schema_version must be 1")
-    if operation not in {"create", "verify"}:
+    if not isinstance(operation, str) or operation not in {"create", "verify"}:
         raise EvidenceKeyringError("operation must be create or verify")
     keys = value["keys"]
     if not isinstance(keys, list) or not keys:
@@ -52,7 +55,7 @@ def authorize_key_use(
             selected = item
     if selected is None:
         raise EvidenceKeyringError("selected key_id is not in the keyring")
-    if selected["state"] not in {"active", "retired"}:
+    if not isinstance(selected["state"], str) or selected["state"] not in {"active", "retired"}:
         raise EvidenceKeyringError("key state must be active or retired")
     current = _time(at, "at")
     activate = _time(selected["activate_at"], "activate_at")
