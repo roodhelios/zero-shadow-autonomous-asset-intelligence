@@ -68,6 +68,20 @@ Repeat the command to verify and reuse the saved evidence (`reused: true`). Chan
 inputs or altered saved artifacts fail the retry rather than silently replacing them.
 Use a new run ID for a new observation. Outputs must stay under the explicit allowed root.
 
+For a concise analyst handoff, repeat the same command with `--format text`:
+
+```bash
+python -m engine.workflow_cli examples/workflow-spec.json --run-id demo-001 \
+  --output-root demo-runs --allowed-root . --format text
+```
+
+The summary shows the asset, risk score `75/100` (`critical`), ownership team
+`application-security`, priority `P0`, due date `2026-09-20`, and evidence directory.
+These dates and decisions belong to the fixed synthetic observation, not today's
+environment. An unassigned owner is shown explicitly as `team null`. A verified retry
+does not rewrite artifacts. JSON remains the default for scripts; the text summary
+is a review aid, not a new evidence contract or an external remediation action.
+
 ```bash
 python database/schema_check.py database/schema.sql
 python -m unittest discover -s tests -v

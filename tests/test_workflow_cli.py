@@ -8,11 +8,44 @@ from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
 
 from engine.workflow_cli import main
+from engine.workflow_cli import review_summary
+from engine.workflow_runs import WorkflowRunResult
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class WorkflowCliTests(unittest.TestCase):
+    def test_text_summary_covers_decisions_and_preserves_retry_artifacts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            args = self.fixtures(root) + ["--format", "text"]
+            output = io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(main(args), 0)
+            text = output.getvalue()
+            for expected in ('(created)', '75/100', '"critical"', '"application-security"',
+                             '"P0"', '"2026-09-20"', 'no action was sent'):
+                self.assertIn(expected, text)
+            artifacts = {path: path.read_bytes() for path in (root / "runs").rglob("*") if path.is_file()}
+            retry = io.StringIO()
+            with redirect_stdout(retry):
+                self.assertEqual(main(args), 0)
+            self.assertIn("(verified retry)", retry.getvalue())
+            self.assertEqual(artifacts, {path: path.read_bytes() for path in artifacts})
+
+    def test_summary_escapes_terminal_controls_and_marks_unassigned_ownership(self):
+        report = {"asset_id": "asset\x1b[31m", "checkpoints": [
+            {"checkpoint": "risk_scored", "evidence": {"score": 0, "band": "low"}},
+            {"checkpoint": "ownership_resolved", "evidence": {"status": "unassigned", "team_id": None}},
+            {"checkpoint": "remediation_planned", "evidence": {"priority": "P3", "due_date": "2026-10-16"}},
+        ]}
+        result = WorkflowRunResult("demo\nforged", "run-example", False, report)
+        text = review_summary(result, Path("runs"))
+        self.assertNotIn("\x1b", text)
+        self.assertNotIn("demo\nforged", text)
+        self.assertIn('"unassigned", team null', text)
+        self.assertIn('demo\\nforged', text)
+
     def fixtures(self, root):
         for name in ("workflow-spec.json", "workflow-assets.json", "ownership-directory.json"):
             shutil.copyfile(ROOT / "examples" / name, root / name)
