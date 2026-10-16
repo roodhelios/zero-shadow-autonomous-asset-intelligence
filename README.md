@@ -55,6 +55,19 @@ Inspect the file before using it as a task list. No tickets or notifications are
 
 ## Validate locally
 
+Run the complete fixture pipeline without Airflow:
+
+```bash
+python -m engine.workflow_cli examples/workflow-spec.json --run-id demo-001 \
+  --output-root demo-runs --allowed-root .
+```
+
+The JSON result includes six checkpoints and a `run_key`. Its directory under
+`demo-runs` holds `evidence.sqlite`, `workflow-report.json`, and `run-manifest.json`.
+Repeat the command to verify and reuse the saved evidence (`reused: true`). Changed
+inputs or altered saved artifacts fail the retry rather than silently replacing them.
+Use a new run ID for a new observation. Outputs must stay under the explicit allowed root.
+
 ```bash
 python database/schema_check.py database/schema.sql
 python -m unittest discover -s tests -v
@@ -81,8 +94,8 @@ privileged users.
 
 The local fixture pipeline works. AWS, network, and osquery connector files and some
 infrastructure files remain placeholders, not working discovery integrations.
-Next work should complete a workflow CLI and deployment validation before connecting
-an authorized external discovery source.
+The workflow CLI is available; next work should validate deployment and persistence
+boundaries before connecting an authorized external discovery source.
 
 See the [threat model](docs/threat-model.md), [design decisions](docs/design-decisions.md),
 and [remediation policy](docs/remediation-model.md). This is an ongoing implementation
