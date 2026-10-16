@@ -1,256 +1,89 @@
-# Zero Shadow Autonomous Asset Intelligence
+# Zero Shadow
 
-Zero Shadow is being built as a local-first asset inventory and risk explanation
-project. The repository began as a directory skeleton. Features are marked as working
-only after code and deterministic tests exist.
+Local asset intelligence that explains why a finding matters, who should review it,
+and which evidence supports its remediation priority.
 
-## Current capability
+Zero Shadow correlates explicitly scoped fixture observations, explains risk scores,
+resolves ownership from tags, and preserves linked evidence in SQLite. It does not
+scan networks, enumerate cloud accounts, or send remediation actions.
 
-The first working slice loads explicitly scoped JSON fixtures and correlates asset
-observations without contacting any network or cloud account.
+## Follow the evidence
 
-It supports:
+| Stage | Working behavior | Implementation |
+| --- | --- | --- |
+| Discover | Validate local observations with synthetic, owned, or authorized scope | [Fixture discovery](engine/discovery/fixture_discovery.py) |
+| Correlate | Merge strong identifiers while retaining observations; IP alone does not merge assets | [Asset graph](engine/correlation/asset_graph.py) |
+| Score | Explain severity, exposure, exploit evidence, and control-state points | [Risk model](engine/risk.py) |
+| Assign | Resolve ownership tags and preserve ambiguity as unassigned | [Ownership rules](docs/ownership-queues.md) |
+| Plan | Produce P0 to P3 priorities with dates and visible factors | [Remediation policy](docs/remediation-model.md) |
+| Preserve | Store linked records, reconstruct snapshots, compare evidence, authenticate manifests | [Architecture](docs/architecture.md) |
 
-- validated source records, hostnames, IP addresses, cloud identifiers, and tags
-- an explicit `synthetic`, `owned`, or `authorized` scope on every fixture batch
-- deterministic correlation using source record IDs, fully qualified hostnames, and
-  complete cloud resource identities
-- preservation of every source observation as evidence
-- stable asset IDs and output ordering
+## Run a local example
 
-The second working slice adds explainable scoring for fixture-backed findings. Each
-assessment reports the exact points from severity, exposure, exploit evidence, and
-control state. Scores are clamped from 0 to 100 and mapped to low, moderate, high, or
-critical bands.
-
-Asset identity confidence is reported beside the score but never changes it. A weak
-correlation should trigger identity review instead of quietly lowering or raising the
-technical risk of a finding.
-
-The remediation planner turns that assessment into a reviewable P0 to P3 priority. It
-applies visible rules for risk band, ownership, and due-date state while retaining the
-complete risk assessment. Missing ownership and overdue work increase urgency, and a
-requested due date cannot extend the risk-based target window.
-
-The ownership directory resolves exact asset tags to synthetic teams. The work-queue
-command groups resolved plans by team and keeps unmatched or ambiguous items visibly
-unassigned. It never guesses between equally specific rules owned by different teams.
-
-Run the local JSON Lines workflow with an explicit review date:
+Use Python 3.11 or newer. These examples need only the standard library, with no cloud
+credentials, Airflow deployment, or database server. From the repository root:
 
 ```bash
-python -m engine.remediation_cli examples/remediation-input.jsonl \
-  --as-of 2026-09-15
+python -m engine.remediation_cli examples/remediation-input.jsonl --as-of 2026-09-15
 ```
 
-See [the remediation model](docs/remediation-model.md) for the exact priority and target
-rules.
-
-Build the example work queues without sending tickets or notifications:
-
-```bash
-python -m engine.work_queue_cli examples/work-queue-input.jsonl \
-  --directory examples/ownership-directory.json \
-  --as-of 2026-09-16 \
-  --output work-queues.json
-```
-
-See [the ownership queue notes](docs/ownership-queues.md) for resolution and ambiguity
-rules.
-
-The local evidence schema now connects assets to source observations, findings,
-ownership decisions, and versioned remediation plans. It uses SQLite so its foreign
-keys, value checks, JSON shape checks, and append-only evidence triggers can be tested
-without external infrastructure:
-
-```bash
-python database/schema_check.py database/schema.sql
-```
-
-See [the architecture notes](docs/architecture.md) for evidence lineage and database
-limitations.
-
-`database/repository.py` now writes a correlated asset, source observations, finding,
-ownership decision, and remediation plan in one SQLite transaction. It rejects
-cross-asset or cross-finding relationships before writing and rolls back earlier rows
-if a later database constraint fails. Tests use only in-memory SQLite and synthetic
-domain objects.
-
-IP addresses do not cause merges by themselves. Addresses are often reassigned or
-shared, so they remain evidence until another strong identifier supports correlation.
-
-## Fixture format
+Selected fields from the fixture output:
 
 ```json
 {
-  "schema_version": 1,
-  "scope": "synthetic",
-  "source": "cmdb",
-  "assets": [
-    {
-      "source_record_id": "server-1",
-      "kind": "server",
-      "hostname": "api.example.test",
-      "ip_addresses": ["192.0.2.10"],
-      "cloud_provider": "aws",
-      "cloud_account": "111122223333",
-      "cloud_resource_id": "i-0123456789abcdef0",
-      "tags": {"owner": "security-lab"}
-    }
-  ]
+  "asset_id": "asset-example",
+  "owner": "platform-team",
+  "priority": "P2",
+  "due_date": "2026-10-15",
+  "risk_assessment": {"score": 35, "band": "moderate"}
 }
 ```
 
-The examples use reserved documentation ranges and synthetic identifiers.
+The complete output includes every scoring factor and priority explanation. The
+explicit review date makes the result reproducible. Risk inputs remain source claims,
+not verified exploitability or a prediction of business impact.
 
-## Run tests
-
-From the repository root:
+Build ownership queues in a new local output file:
 
 ```bash
+python -m engine.work_queue_cli examples/work-queue-input.jsonl \
+  --directory examples/ownership-directory.json --as-of 2026-09-16 \
+  --output work-queues.json
+```
+
+Inspect the file before using it as a task list. No tickets or notifications are sent.
+
+## Validate locally
+
+```bash
+python database/schema_check.py database/schema.sql
 python -m unittest discover -s tests -v
 ```
 
-## Security boundary
+The manual Airflow DAG delegates to the [fixture workflow](engine/evidence_workflow.py).
+Python tests do not establish that an Airflow deployment has been exercised.
 
-This milestone accepts local fixture files only. It does not enumerate DNS, query cloud
-APIs, scan addresses, or authenticate to external systems. Later discovery connectors
-must keep the same explicit scope checks and must be tested against mocks before any
-authorized integration is considered.
+## Explore the interfaces
 
-Risk inputs are source claims, not verified facts. An `observed` exploit-evidence value
-must come from an owned or explicitly authorized evidence source. The scoring model is
-a transparent triage rule, not a prediction of exploitation or business impact.
+| Need | Entry point |
+| --- | --- |
+| Read stored evidence | `python -m database.evidence_reader_cli --help` |
+| Compare snapshots | `python -m database.evidence_diff_cli --help` |
+| Authenticate a snapshot | `python -m database.evidence_auth_cli --help` |
+| Check local storage | `python -m database.storage_probe --help` |
+| Inspect a complete fixture workflow | [Workflow spec](examples/workflow-spec.json) |
 
-## Next milestone
+Keep secret keys outside Git. HMAC provides shared-secret authentication, not independent
+signer identity. Storage checks do not prove crash guarantees or protection from
+privileged users.
 
-The first Airflow DAG is now defined in `airflow/dags/asset_discovery_dag.py`. It runs
-only when triggered manually and uses local paths supplied through environment
-variables. A preflight task validates the local scope before a second task correlates,
-scores, assigns, plans, and persists one synthetic evidence bundle.
+## Status and next work
 
-The underlying `engine/evidence_workflow.py` module is testable without Airflow. Its
-report records six checkpoints from fixture loading through evidence persistence. The
-runner creates new SQLite and JSON outputs and refuses to overwrite evidence from an
-earlier run.
+The local fixture pipeline works. AWS, network, and osquery connector files and some
+infrastructure files remain placeholders, not working discovery integrations.
+Next work should complete a workflow CLI and deployment validation before connecting
+an authorized external discovery source.
 
-This milestone does not install Airflow, schedule recurring work, contact cloud APIs,
-or send tickets.
-
-Run-scoped retry handling now derives a fixed directory key from the Airflow run ID.
-The directory contains the SQLite database, workflow report, and a manifest with hashes
-for every input and artifact. A retry reuses a completed run only when those hashes
-still match. Changed input, modified output, or an incomplete directory fails visibly.
-
-Stored evidence can now be reconstructed through a read-only Python boundary:
-
-```bash
-python -m database.evidence_reader_cli path/to/evidence.sqlite \
-  --asset-id asset-id-from-workflow-report \
-  --output asset-evidence.json
-```
-
-The reader returns the asset, retained observations, findings, ownership decisions,
-and remediation plans in deterministic order. It checks that duplicated source and
-finding fields still match their stored JSON evidence, requires a complete linked
-bundle, and adds a SHA-256 digest for comparing exports. The command opens SQLite in
-read-only mode and refuses to replace an existing output file.
-
-Two exported snapshots of the same asset can be compared without reopening either
-database:
-
-```bash
-python -m database.evidence_diff_cli base-snapshot.json current-snapshot.json \
-  --output asset-diff.json
-```
-
-The comparison verifies both snapshot digests before reading their evidence. It reports
-added, removed, and modified observation, finding, ownership, and remediation IDs plus
-changed asset fields. Different asset IDs, duplicate evidence IDs, an invalid digest,
-remote paths, and output replacement fail visibly. The result describes local evidence
-drift only. It does not discover assets or prove which snapshot is authoritative.
-
-The DAG passes its run ID to this boundary and allows one retry. Airflow is not
-installed in the validation environment, so the callable and import boundary are
-tested directly. The next step is to repeat the retry test in a disposable Airflow
-installation and confirm the task-instance behavior.
-
-To authenticate an export across storage or transfer, create a detached HMAC-SHA256
-manifest with a key held separately from the snapshot:
-
-```bash
-python -c "import secrets; open('/secure/path/zero-shadow.key', 'xb').write(secrets.token_bytes(32))"
-chmod 600 /secure/path/zero-shadow.key
-python -m database.evidence_auth_cli create asset-evidence.json \
-  --key-file /secure/path/zero-shadow.key --output asset-evidence.auth.json
-python -m database.evidence_auth_cli verify asset-evidence.json \
-  asset-evidence.auth.json --key-file /secure/path/zero-shadow.key
-```
-
-The manifest authenticates the asset ID and validated snapshot digest. Keep the key
-outside the repository and evidence bundle. HMAC is symmetric: anyone with the key can
-create a valid manifest, so this does not provide non-repudiation or independent
-verification by a party that must not hold the key.
-On POSIX, the CLI refuses a key file readable or writable by group or other users.
-Restrict it to the owner, for example with `chmod 600`, before creating or verifying a
-manifest. Other operating systems may enforce key-file access through different ACLs.
-
-To apply non-secret rotation metadata, pass a keyring document:
-
-```bash
-python -m database.evidence_auth_cli create asset-evidence.json \
-  --key-file /secure/path/zero-shadow.key --key-id snapshot-key-2026-09 \
-  --keyring examples/evidence-keyring-v1.json --output asset-evidence.auth.json
-python -m database.evidence_auth_cli verify asset-evidence.json \
-  asset-evidence.auth.json --key-file /secure/path/zero-shadow.key \
-  --key-id snapshot-key-2026-08 --keyring examples/evidence-keyring-v1.json
-```
-
-The CLI checks key validity using the local system clock. Active keys can create and
-verify during their configured window. Retired keys can verify until `verify_until`,
-but cannot create. The example keyring contains labels and dates only. Protect its
-integrity separately, keep key bytes out of it, and use a trusted system clock. A
-locally editable keyring is not an independent trust anchor.
-On POSIX, the CLI refuses a keyring file with group or other write permission. Read
-permission is allowed because the keyring contains labels and dates, not key material.
-This only reduces shared-account modification. It does not protect against the file
-owner, root, or a process running as the same user.
-
-Detached manifests are written to a private temporary file in the destination directory,
-flushed, synchronized, and then published with a hard link that cannot replace an
-existing path. Readers therefore see either no output or complete JSON. Temporary files
-are removed after success or failure. After publication, the destination directory is
-synchronized so the new name has an explicit durability boundary. If that final sync
-fails, the command reports an error but leaves the complete published manifest in place;
-the operator must inspect it before retrying. Actual crash guarantees still depend on the
-filesystem, mount options, storage controller, and operating system.
-
-Before selecting an evidence directory, probe the exact mounted path used by the
-deployment:
-
-```bash
-python -m database.storage_probe /path/to/evidence-directory
-```
-
-The probe creates two private temporary names, exercises exclusive creation, file
-synchronization, hard-link publication, and directory synchronization, then removes
-the probe files. It also attempts a second publication to the same name and requires
-an `EEXIST` collision while confirming the first artifact remains unchanged. This
-checks the no-replace assumption used by detached evidence manifests on that storage.
-Cleanup synchronizes the directory and retains no evidence. The probe performs no
-network activity. A successful result confirms that the current runtime and mounted path expose
-the required primitives. It does not prove behavior during power loss or storage
-controller failure, so deployment-specific crash testing is still required.
-
-The storage probe completes partial writes and retries interrupted writes before
-synchronizing either temporary artifact. A write that makes no progress fails and
-cleans up instead of reporting supported storage. This is not a crash simulation.
-
-On POSIX, the probe reports the directory mode and whether group and other permission
-bits are absent. Add `--require-private` to reject a shared evidence directory before
-creating probe files. This is a deployment check, not a claim that mode bits alone
-prove ownership, mount isolation, or protection from privileged users.
-
-Add `--expected-owner-uid` to reject a POSIX evidence directory owned by a
-different numeric user ID before creating probe files. UID equality does not evaluate
-user namespaces, access control lists, or permissions on parent paths.
+See the [threat model](docs/threat-model.md), [design decisions](docs/design-decisions.md),
+and [remediation policy](docs/remediation-model.md). This is an ongoing implementation
+with assistant support.
