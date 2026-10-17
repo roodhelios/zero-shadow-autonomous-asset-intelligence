@@ -82,6 +82,21 @@ environment. An unassigned owner is shown explicitly as `team null`. A verified 
 does not rewrite artifacts. JSON remains the default for scripts; the text summary
 is a review aid, not a new evidence contract or an external remediation action.
 
+Inspect the evidence behind those decisions directly from the same run:
+
+```bash
+python -m engine.workflow_cli examples/workflow-spec.json --run-id demo-001 \
+  --output-root demo-runs --allowed-root . --format snapshot
+```
+
+This verifies the run's saved hashes, then reconstructs the asset through a read-only
+SQLite connection. JSON includes observations, finding evidence, ownership decisions,
+remediation actions and factors, and `snapshot_sha256`. For the fixture, inspect one
+finding and its P0 plan with risk score 75. The run report remains the default output;
+snapshot mode uses the existing evidence snapshot format and does not rewrite saved
+artifacts. Snapshot data may be sensitive when using authorized non-fixture inputs.
+Keep any redirected output private and outside Git. A digest is not source authentication.
+
 ```bash
 python database/schema_check.py database/schema.sql
 python -m unittest discover -s tests -v
@@ -114,3 +129,4 @@ boundaries before connecting an authorized external discovery source.
 See the [threat model](docs/threat-model.md), [design decisions](docs/design-decisions.md),
 and [remediation policy](docs/remediation-model.md). This is an ongoing implementation
 with assistant support.
+

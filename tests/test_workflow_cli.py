@@ -6,7 +6,9 @@ import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from pathlib import Path
+from unittest.mock import patch
 
+from database.evidence_reader import EvidenceReadError
 from engine.workflow_cli import main
 from engine.workflow_cli import review_summary
 from engine.workflow_runs import WorkflowRunResult
@@ -15,6 +17,38 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class WorkflowCliTests(unittest.TestCase):
+    def test_snapshot_reconstruction_failure_emits_no_success_document(self):
+        with tempfile.TemporaryDirectory() as directory:
+            args = self.fixtures(Path(directory)) + ["--format", "snapshot"]
+            output = io.StringIO()
+            with patch("engine.workflow_cli.EvidenceReader.read_asset", side_effect=EvidenceReadError("invalid evidence")):
+                with redirect_stdout(output), redirect_stderr(io.StringIO()):
+                    self.assertEqual(main(args), 2)
+            self.assertEqual(output.getvalue(), "")
+
+    def test_snapshot_output_exposes_linked_evidence_without_rewriting_artifacts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            args = self.fixtures(root) + ["--format", "snapshot"]
+            output = io.StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(main(args), 0)
+            snapshot = json.loads(output.getvalue())
+            self.assertEqual(len(snapshot["findings"]), 1)
+            self.assertEqual(len(snapshot["observations"]), 1)
+            self.assertEqual(snapshot["ownership_decisions"][0]["team_id"], "application-security")
+            plan = snapshot["remediation_plans"][0]
+            self.assertEqual(plan["risk_score"], 75)
+            self.assertEqual(plan["priority"], "P0")
+            self.assertTrue(plan["factors"])
+            self.assertTrue(plan["actions"])
+            artifacts = {p: p.read_bytes() for p in (root / "runs").rglob("*") if p.is_file()}
+            retry = io.StringIO()
+            with redirect_stdout(retry):
+                self.assertEqual(main(args), 0)
+            self.assertEqual(json.loads(retry.getvalue()), snapshot)
+            self.assertEqual(artifacts, {p: p.read_bytes() for p in artifacts})
+
     def test_text_summary_covers_decisions_and_preserves_retry_artifacts(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -88,3 +122,4 @@ class WorkflowCliTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
