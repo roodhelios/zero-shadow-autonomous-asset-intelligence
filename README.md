@@ -107,6 +107,18 @@ Python tests do not establish that an Airflow deployment has been exercised.
 
 ## Explore the interfaces
 
+Import a saved osquery host-identity export without running a collector:
+
+```bash
+python -m engine.discovery.osquery_collector examples/osquery-system-info.json \
+  --scope synthetic --output /tmp/zero-shadow-osquery-assets.json
+```
+
+The synthetic example becomes a fixture-compatible host observation with a canonical
+UUID and an input digest. The [osquery import guide](docs/osquery-import.md) documents
+the two-column input, limits, privacy considerations, and connection to the existing
+SQLite workflow. No ownership, exposure, or vulnerability finding is inferred.
+
 | Need | Entry point |
 | --- | --- |
 | Read stored evidence | `python -m database.evidence_reader_cli --help` |
@@ -121,12 +133,14 @@ privileged users.
 
 ## Status and next work
 
-The local fixture pipeline works. AWS, network, and osquery connector files and some
-infrastructure files remain placeholders, not working discovery integrations.
+The local fixture pipeline and saved osquery JSON import work. AWS and network
+connector files and some infrastructure files remain placeholders. Live osquery
+collection is not implemented; the importer reads only a supplied local file.
 The workflow CLI is available; next work should validate deployment and persistence
 boundaries before connecting an authorized external discovery source.
 
 See the [threat model](docs/threat-model.md), [design decisions](docs/design-decisions.md),
 and [remediation policy](docs/remediation-model.md). This is an ongoing implementation
 with assistant support.
+
 
