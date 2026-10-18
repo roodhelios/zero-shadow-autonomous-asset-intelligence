@@ -127,6 +127,10 @@ SQLite workflow. No ownership, exposure, or vulnerability finding is inferred.
 | Check local storage | `python -m database.storage_probe --help` |
 | Inspect a complete fixture workflow | [Workflow spec](examples/workflow-spec.json) |
 
+Key lifecycle metadata rejects non-string operations and states, boolean schema
+versions, oversized timestamps, and dates outside the UTC range. Private storage
+permission checks require POSIX and fail before creating files on other platforms.
+
 Keep secret keys outside Git. HMAC provides shared-secret authentication, not independent
 signer identity. Storage checks do not prove crash guarantees or protection from
 privileged users.
