@@ -5,5 +5,6 @@ venv/
 .airflow/
 *.db
 *.sqlite3
+demo-runs/
 .idea/
 .vscode/
