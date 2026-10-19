@@ -118,6 +118,9 @@ The synthetic example becomes a fixture-compatible host observation with a canon
 UUID and an input digest. The [osquery import guide](docs/osquery-import.md) documents
 the two-column input, limits, privacy considerations, and connection to the existing
 SQLite workflow. No ownership, exposure, or vulnerability finding is inferred.
+Add `--format inventory` to the same command to see stable asset IDs, correlation
+keys, retained observations, and the input digest directly. The included export
+produces one observation and one asset. The default output remains a workflow fixture.
 
 | Need | Entry point |
 | --- | --- |

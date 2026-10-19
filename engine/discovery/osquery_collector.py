@@ -15,6 +15,7 @@ from pathlib import Path
 
 from engine.discovery.fixture_discovery import ALLOWED_SCOPES
 from engine.models import AssetObservation, AssetValidationError
+from engine.correlation import correlate_assets
 
 MAX_INPUT_BYTES = 4 * 1024 * 1024
 MAX_ROWS = 10_000
@@ -63,6 +64,19 @@ def convert_system_info(data: bytes, *, scope: str) -> dict:
             "import_metadata": {"table": "system_info", "input_sha256": hashlib.sha256(data).hexdigest()}}
 
 
+def convert_inventory(data: bytes, *, scope: str) -> dict:
+    """Build a correlated inventory from the validated saved export."""
+    fixture = convert_system_info(data, scope=scope)
+    observations = [AssetObservation.from_dict(fixture["source"], item)
+                    for item in fixture["assets"]]
+    assets = correlate_assets(observations)
+    return {"schema_version": 1, "report_type": "osquery-inventory",
+            "source": fixture["source"], "scope": fixture["scope"],
+            "input_sha256": fixture["import_metadata"]["input_sha256"],
+            "observation_count": len(observations), "asset_count": len(assets),
+            "assets": [asset.to_dict() for asset in assets]}
+
+
 def _read(path):
     flags = os.O_RDONLY | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_NOFOLLOW", 0)
     with os.fdopen(os.open(path, flags), "rb") as source:
@@ -90,10 +104,13 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("export", type=Path, help="saved JSON array from SELECT hostname, uuid FROM system_info")
     parser.add_argument("--scope", choices=sorted(ALLOWED_SCOPES), required=True)
-    parser.add_argument("--output", type=Path, help="new private fixture file, never overwrite")
+    parser.add_argument("--format", choices=("fixture", "inventory"), default="fixture",
+                        help="fixture for the workflow, or a correlated inventory report")
+    parser.add_argument("--output", type=Path, help="new private JSON file, never overwrite")
     args = parser.parse_args(argv)
     try:
-        result = convert_system_info(_read(args.export), scope=args.scope)
+        convert = convert_inventory if args.format == "inventory" else convert_system_info
+        result = convert(_read(args.export), scope=args.scope)
         rendered = json.dumps(result, indent=2, sort_keys=True, allow_nan=False) + "\n"
         if args.output is None:
             print(rendered, end="")
