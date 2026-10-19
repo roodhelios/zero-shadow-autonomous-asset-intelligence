@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "scope": "synthetic",
+  "source": "cmdb-fixture",
+  "assets": [
+    {
+      "source_record_id": "server-checkout-1", "kind": "server",
+      "hostname": "checkout.example.test", "ip_addresses": ["192.0.2.40"],
+      "cloud_provider": "aws", "cloud_account": "111122223333",
+      "cloud_resource_id": "i-0123456789abcdef0",
+      "tags": {"environment": "test", "exposure": "internet", "service": "web"}
+    },
+    {"source_record_id": "other", "kind": "server", "hostname": "other.example.test",
+     "tags": {"service": "unknown"}}
+  ]
+}

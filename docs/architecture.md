@@ -51,7 +51,7 @@ not create a database, discover assets, or schedule work on its own.
 ## Fixture workflow checkpoints
 
 `engine/evidence_workflow.py` connects the existing local components without adding an
-external discovery source. It loads one explicitly scoped fixture, requires exactly one
+external discovery source. It loads one explicitly scoped fixture, selects one
 correlated asset, scores one finding, resolves ownership, plans remediation, and writes
 the linked bundle through the repository adapter.
 
@@ -62,6 +62,35 @@ workflow removes its incomplete database rather than leaving partial evidence.
 
 The Airflow DAG is a thin manual wrapper around this tested module. It has no schedule,
 credentials, network connector, notification, or ticketing task.
+
+## Select one asset from a batch
+
+Version 1 workflow specs may include an optional non-empty `asset_id`. Correlation
+still examines the complete fixture before selection. The supplied finding is then
+bound only to that exact correlated ID; no first-host fallback or hostname guessing
+is used. An absent selector retains the existing single-asset behavior and rejects
+an ambiguous multi-asset fixture. A missing selected identity fails before storage.
+
+The caller must independently establish that the finding applies to the selected
+asset. Selection is not proof of that association. No finding or remediation state
+is manufactured for excluded identities. New reports show the batch asset count,
+excluded count, and selection mode in `asset_correlated`. The database holds only
+the selected evidence bundle, not a complete inventory of the fixture.
+
+Use `examples/workflow-selection-spec.json` for the two-asset example. To inspect
+correlated IDs for a different reviewed fixture, run locally from the repository root:
+
+```bash
+python -c 'from engine.discovery import load_fixture; from engine.correlation import correlate_assets; import json; print(json.dumps([a.to_dict() for a in correlate_assets(load_fixture("examples/workflow-selection-assets.json").observations)], sort_keys=True))'
+```
+
+This prints supplied observation data, including identifiers and hostnames. Use only
+synthetic or authorized files and keep redirected data private and outside Git.
+Correlated IDs can change when strong identity keys change. An old selector then
+fails instead of silently following a renamed host. The selector is inside the hashed
+spec, so a completed run cannot be reused after changing the target; choose a new run
+ID for a separately reviewed assessment. This remains one finding on one selected
+asset, not multi-finding batch processing or an ownership enforcement boundary.
 
 ## Run identity and retries
 
