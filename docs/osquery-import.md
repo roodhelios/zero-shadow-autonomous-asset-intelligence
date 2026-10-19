@@ -79,8 +79,9 @@ python -m database.evidence_reader_cli /tmp/zero-shadow-inventory.sqlite \
 The first command validates and correlates the export, commits assets and observations
 in one SQLite transaction, closes the database, and publishes a complete new file with
 0600 permissions on POSIX. No schema migration is needed. It prints asset IDs and the
-exact input digest. Keep that receipt and the export separately; the input-byte digest
-is not stored as an additional database provenance record. The supplied timezone-aware
+exact input digest. It now retains an append-only import receipt containing that
+digest, claimed scope, UTC observation time, asset IDs, and observation count inside
+the same published database. The supplied timezone-aware
 observation time and scope are caller claims, not independently verified.
 
 The reader opens SQLite read-only. `--inventory` permits empty finding, ownership,
@@ -97,6 +98,30 @@ service. Real inventory identifiers and exported snapshots can be sensitive. Kee
 files outside Git, and protect any stdout redirection yourself.
 For an exported snapshot file, the reader's `--output NEW_FILE` now uses the same
 complete private exclusive publisher as the importer instead of a normal text write.
+
+Reconcile the receipt and retained observations:
+
+```bash
+python -m database.inventory_receipt /tmp/zero-shadow-inventory.sqlite \
+  --export examples/osquery-system-info.json
+```
+
+The receipt includes a canonical SHA-256 digest. The reader checks it, asset IDs,
+observation count, source, scope, and time against stored rows. With `--export`, it
+also checks the exact input-byte digest and regenerates correlated observations to
+compare payloads and IDs. The example returns `status: consistent` and
+`original_export_checked: true`. Without `--export`, that field is false; no claim is
+made that the original file was checked. Even JSON whitespace changes in the export
+fail the exact-byte check. The reader opens an owned or trusted local database
+read-only and emits no original export bytes.
+
+Older inventory databases lack this receipt table and are rejected by this command;
+their existing inventory snapshots still work. Re-import the retained original into
+a new database rather than editing old evidence. The base evidence schema remains
+version 1; the inventory-only receipt is a versioned optional extension. Append-only
+triggers and hashes do not protect against a privileged database writer replacing
+rows, triggers, and digests together. This is consistency checking, not authentication,
+attestation, proof of scan completeness, or credential-free certification.
 
 ## Limits and failure behavior
 
