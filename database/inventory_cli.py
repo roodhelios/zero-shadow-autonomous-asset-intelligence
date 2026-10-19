@@ -9,7 +9,8 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
-from database.repository import EvidenceRepository, ALLOWED_SCOPES
+from database.repository import EvidenceRepository, ALLOWED_SCOPES, _timestamp
+from database.inventory_receipt import store_receipt
 from engine.correlation import correlate_assets
 from engine.discovery.osquery_collector import _read, convert_system_info
 from engine.models import AssetObservation
@@ -29,6 +30,14 @@ def store_export(source: Path, output: Path, *, scope: str, observed_at: datetim
         try:
             connection.executescript(Path(__file__).with_name("schema.sql").read_text())
             EvidenceRepository(connection).store_inventory(assets, scope=scope, observed_at=observed_at)
+            receipt_digest = store_receipt(connection, {
+                "schema_version": 1, "report_type": "inventory-import",
+                "source": fixture["source"], "scope": scope,
+                "observed_at": _timestamp(observed_at, "observed_at"),
+                "asset_ids": [asset.asset_id for asset in assets],
+                "observation_count": len(fixture["assets"]),
+                "input_sha256": fixture["import_metadata"]["input_sha256"],
+            })
         finally:
             connection.close()
         with open(temporary, "rb") as handle:
@@ -37,6 +46,7 @@ def store_export(source: Path, output: Path, *, scope: str, observed_at: datetim
     finally:
         Path(temporary).unlink(missing_ok=True)
     return {"schema_version": 1, "status": "stored", "scope": scope,
+            "receipt_sha256": receipt_digest,
             "asset_ids": [asset.asset_id for asset in assets],
             "observation_count": len(fixture["assets"]),
             "input_sha256": fixture["import_metadata"]["input_sha256"]}

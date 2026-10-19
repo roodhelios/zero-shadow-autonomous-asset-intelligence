@@ -135,6 +135,17 @@ Use a fresh output path on POSIX. The snapshot contains one observation and empt
 finding, ownership, and remediation arrays. Default reader mode still requires a
 complete decision bundle. See the import guide for storage and privacy limits.
 
+New inventories also retain their import receipt inside SQLite. Reconcile it with
+the original export in another process:
+
+```bash
+python -m database.inventory_receipt /tmp/zero-shadow-inventory.sqlite \
+  --export examples/osquery-system-info.json
+```
+
+Expect `status: consistent` and `original_export_checked: true`. This checks internal
+consistency and the retained bytes, not the truth of source claims or authorization.
+
 | Need | Entry point |
 | --- | --- |
 | Read stored evidence | `python -m database.evidence_reader_cli --help` |
