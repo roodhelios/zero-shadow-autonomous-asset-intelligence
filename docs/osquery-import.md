@@ -36,7 +36,23 @@ tags, exposure claims, or vulnerability findings.
 
 ## Use the existing workflow
 
-The output can be loaded by `load_fixture` and correlated by the existing asset graph.
+Inspect a correlated inventory directly, without editing a workflow spec:
+
+```bash
+python -m engine.discovery.osquery_collector examples/osquery-system-info.json \
+  --scope synthetic --format inventory
+```
+
+The report has `report_type: osquery-inventory`, `observation_count: 1`,
+`asset_count: 1`, a stable asset ID, correlation keys, and the retained observation.
+`input_sha256` covers the exact export bytes. Two UUID claims sharing an FQDN merge
+under the existing graph rule, with both observations retained; distinct FQDNs remain
+separate. This is source-claimed identity, not attestation. No risk, ownership,
+exposure, or vulnerability finding is inferred. Use `--output` for a new private
+report file. Inventory reports are not fixture input; the default `--format fixture`
+continues to produce the workflow-compatible contract.
+
+The default fixture output can be loaded by `load_fixture` and correlated by the existing asset graph.
 For an explicitly authorized evidence workflow, make a local workflow-spec copy and
 set its `asset_fixture` to the converted file, relative to that spec. Keep all files
 inside the CLI's explicit `--allowed-root`. Supply independently reviewed finding
