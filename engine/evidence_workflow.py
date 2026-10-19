@@ -83,6 +83,7 @@ class WorkflowSpec:
     decision_id: str
     plan_id: str
     plan_version: int
+    asset_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -156,7 +157,7 @@ def load_workflow_spec(
         "plan_id",
         "plan_version",
     }
-    _exact_fields(value, expected, "workflow spec")
+    _exact_fields(value, expected | ({"asset_id"} if "asset_id" in value else set()), "workflow spec")
     if type(value["schema_version"]) is not int or value["schema_version"] != 1:
         raise EvidenceWorkflowError("schema_version must be 1")
     finding = value["finding"]
@@ -192,6 +193,7 @@ def load_workflow_spec(
         decision_id=_text(value["decision_id"], "decision_id"),
         plan_id=_text(value["plan_id"], "plan_id"),
         plan_version=plan_version,
+        asset_id=_text(value["asset_id"], "asset_id") if "asset_id" in value else None,
     )
 
 
@@ -224,15 +226,23 @@ def run_fixture_workflow(
         )
     ]
     assets = correlate_assets(batch.observations)
-    if len(assets) != 1:
+    if spec.asset_id is not None:
+        selected = [item for item in assets if item.asset_id == spec.asset_id]
+        if len(selected) != 1:
+            raise EvidenceWorkflowError("selected asset_id is not in the correlated fixture")
+        asset = selected[0]
+    elif len(assets) != 1:
         raise EvidenceWorkflowError(
-            "fixture workflow requires observations for exactly one correlated asset"
+            "fixture workflow requires exactly one correlated asset or an explicit asset_id"
         )
-    asset = assets[0]
+    else:
+        asset = assets[0]
     checkpoints.append(
         WorkflowCheckpoint(
             "asset_correlated",
-            {"asset_id": asset.asset_id, "observation_count": len(asset.observations)},
+            {"asset_id": asset.asset_id, "observation_count": len(asset.observations),
+             "batch_asset_count": len(assets), "excluded_asset_count": len(assets) - 1,
+             "selection": "explicit" if spec.asset_id is not None else "single_asset"},
         )
     )
 

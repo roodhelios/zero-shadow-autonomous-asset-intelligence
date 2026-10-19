@@ -107,6 +107,22 @@ Python tests do not establish that an Airflow deployment has been exercised.
 
 ## Explore the interfaces
 
+Assess one reviewed identity from a multi-asset batch without attaching its finding
+to every discovered host:
+
+```bash
+python -m engine.workflow_cli examples/workflow-selection-spec.json --run-id selected-001 \
+  --output-root demo-runs --allowed-root . --format text
+```
+
+This fixture has two correlated assets. The spec explicitly selects
+`asset-0eb80d82444587d9`, the checkout server. Expect the existing synthetic risk
+score 75 and P0 plan for that identity only. The `asset_correlated` checkpoint records
+`batch_asset_count: 2`, `excluded_asset_count: 1`, and `selection: explicit`.
+The other host receives no finding, risk score, ownership decision, or plan and is
+not persisted by this single-bundle run. See [selection rules](docs/architecture.md#select-one-asset-from-a-batch)
+before adapting the spec to authorized data.
+
 Import a saved osquery host-identity export without running a collector:
 
 ```bash
