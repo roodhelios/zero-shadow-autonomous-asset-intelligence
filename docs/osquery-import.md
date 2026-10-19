@@ -64,6 +64,40 @@ all six workflow checkpoints, SQLite persistence, and read-only reconstruction.
 With no ownership tags, that exercise records `status: unmatched` and `team_id: null`.
 There is no invented owner and no implied vulnerability assessment from system_info.
 
+## Retain discovery before any assessment
+
+The workflow needs independent finding evidence. When that evidence does not exist,
+use discovery-only storage instead of filling in a synthetic vulnerability:
+
+```bash
+python -m database.inventory_cli examples/osquery-system-info.json --scope synthetic \
+  --observed-at 2026-10-19T00:00:00Z --output /tmp/zero-shadow-inventory.sqlite
+python -m database.evidence_reader_cli /tmp/zero-shadow-inventory.sqlite \
+  --asset-id asset-752c9c1b37e66798 --inventory
+```
+
+The first command validates and correlates the export, commits assets and observations
+in one SQLite transaction, closes the database, and publishes a complete new file with
+0600 permissions on POSIX. No schema migration is needed. It prints asset IDs and the
+exact input digest. Keep that receipt and the export separately; the input-byte digest
+is not stored as an additional database provenance record. The supplied timezone-aware
+observation time and scope are caller claims, not independently verified.
+
+The reader opens SQLite read-only. `--inventory` permits empty finding, ownership,
+and plan arrays while retaining observation checks and the snapshot digest. Without
+that explicit option, the existing decision-bundle requirements are unchanged. An
+empty array means no decision was retained, not that a host was checked and found safe.
+
+Each import creates a separate database, never updates an existing one. Duplicate
+observation identities roll back the batch. Existing output files are preserved,
+including a concurrently created destination. Temporary databases are cleaned on
+ordinary failures. Parent directories must be trusted. Hard links are required and
+directory crash durability is not established; this is not a multi-run inventory
+service. Real inventory identifiers and exported snapshots can be sensitive. Keep
+files outside Git, and protect any stdout redirection yourself.
+For an exported snapshot file, the reader's `--output NEW_FILE` now uses the same
+complete private exclusive publisher as the importer instead of a normal text write.
+
 ## Limits and failure behavior
 
 - Scope must be explicitly `synthetic`, `owned`, or `authorized`. This is a caller

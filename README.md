@@ -122,6 +122,19 @@ Add `--format inventory` to the same command to see stable asset IDs, correlatio
 keys, retained observations, and the input digest directly. The included export
 produces one observation and one asset. The default output remains a workflow fixture.
 
+Retain discovery evidence without inventing a vulnerability finding:
+
+```bash
+python -m database.inventory_cli examples/osquery-system-info.json --scope synthetic \
+  --observed-at 2026-10-19T00:00:00Z --output /tmp/zero-shadow-inventory.sqlite
+python -m database.evidence_reader_cli /tmp/zero-shadow-inventory.sqlite \
+  --asset-id asset-752c9c1b37e66798 --inventory
+```
+
+Use a fresh output path on POSIX. The snapshot contains one observation and empty
+finding, ownership, and remediation arrays. Default reader mode still requires a
+complete decision bundle. See the import guide for storage and privacy limits.
+
 | Need | Entry point |
 | --- | --- |
 | Read stored evidence | `python -m database.evidence_reader_cli --help` |

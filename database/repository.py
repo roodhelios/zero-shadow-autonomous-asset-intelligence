@@ -118,6 +118,33 @@ class EvidenceRepository:
         if not enabled:
             raise EvidenceRepositoryError("SQLite foreign key enforcement is required")
 
+    def store_inventory(self, assets: tuple[ConsolidatedAsset, ...], *,
+                        scope: Scope, observed_at: datetime) -> None:
+        """Retain one discovery batch without inventing findings or decisions."""
+        if not isinstance(scope, str) or scope not in ALLOWED_SCOPES:
+            raise EvidenceRepositoryError("explicit discovery scope is required")
+        timestamp = _timestamp(observed_at, "observed_at")
+        if not assets or any(not asset.observations for asset in assets):
+            raise EvidenceRepositoryError("inventory must retain source observations")
+        with self.connection:
+            for asset in assets:
+                self.connection.execute(
+                    """INSERT INTO assets
+                       (asset_id, kind_summary_json, primary_hostname, created_at, updated_at)
+                       VALUES (?, ?, ?, ?, ?)""",
+                    (_text(asset.asset_id, "asset_id"), _json(list(asset.kinds)),
+                     asset.hostnames[0] if asset.hostnames else None, timestamp, timestamp),
+                )
+                for observation in asset.observations:
+                    self.connection.execute(
+                        """INSERT INTO asset_observations
+                           (observation_id, asset_id, source, source_record_id, scope,
+                            observed_at, payload_json) VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                        (_observation_id(asset.asset_id, observation.source, observation.source_record_id),
+                         asset.asset_id, observation.source, observation.source_record_id,
+                         scope, timestamp, _json(observation.to_dict())),
+                    )
+
     def store_bundle(self, bundle: EvidenceBundle) -> EvidenceWriteResult:
         bundle.validate()
         observed_at = _timestamp(bundle.observed_at, "observed_at")

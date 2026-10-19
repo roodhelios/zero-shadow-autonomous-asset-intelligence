@@ -11,6 +11,7 @@ from typing import Sequence
 from urllib.parse import quote
 
 from .evidence_reader import EvidenceReadError, EvidenceReader
+from engine.discovery.osquery_collector import _publish
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -20,6 +21,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("database", type=Path)
     parser.add_argument("--asset-id", required=True)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--inventory", action="store_true",
+                        help="allow discovery-only assets with no findings or decisions")
     args = parser.parse_args(argv)
 
     connection = None
@@ -37,10 +40,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 raise EvidenceReadError("output already exists")
         uri = f"file:{quote(str(database), safe='/')}?mode=ro"
         connection = sqlite3.connect(uri, uri=True)
-        snapshot = EvidenceReader(connection).read_asset(args.asset_id)
+        reader = EvidenceReader(connection)
+        snapshot = (reader.read_inventory if args.inventory else reader.read_asset)(args.asset_id)
         rendered = json.dumps(snapshot.to_dict(), indent=2, sort_keys=True) + "\n"
         if args.output:
-            args.output.write_text(rendered, encoding="utf-8")
+            _publish(output, rendered)
         else:
             print(rendered, end="")
     except (EvidenceReadError, OSError, sqlite3.DatabaseError) as exc:

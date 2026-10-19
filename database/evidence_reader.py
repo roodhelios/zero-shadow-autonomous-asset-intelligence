@@ -73,6 +73,13 @@ class EvidenceReader:
         self.connection.execute("PRAGMA foreign_keys = ON")
 
     def read_asset(self, asset_id: str) -> EvidenceSnapshot:
+        return self._read_asset(asset_id, require_decisions=True)
+
+    def read_inventory(self, asset_id: str) -> EvidenceSnapshot:
+        """Read discovery evidence; absent decisions remain empty, not inferred."""
+        return self._read_asset(asset_id, require_decisions=False)
+
+    def _read_asset(self, asset_id: str, *, require_decisions: bool) -> EvidenceSnapshot:
         normalized_id = _text(asset_id, "asset_id")
         try:
             asset_row = self.connection.execute(
@@ -105,12 +112,12 @@ class EvidenceReader:
 
         if not observations:
             raise EvidenceReadError("asset has no retained source observations")
-        if not findings:
+        if require_decisions and not findings:
             raise EvidenceReadError("asset has no retained findings")
-        if not ownership:
+        if require_decisions and not ownership:
             raise EvidenceReadError("asset has no retained ownership decisions")
         finding_ids = {item["finding_id"] for item in findings}
-        if not plans or any(item["finding_id"] not in finding_ids for item in plans):
+        if (require_decisions and not plans) or any(item["finding_id"] not in finding_ids for item in plans):
             raise EvidenceReadError("asset remediation plans do not match its findings")
 
         body = {
