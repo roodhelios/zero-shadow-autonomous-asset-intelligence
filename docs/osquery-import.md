@@ -123,6 +123,45 @@ triggers and hashes do not protect against a privileged database writer replacin
 rows, triggers, and digests together. This is consistency checking, not authentication,
 attestation, proof of scan completeness, or credential-free certification.
 
+## Compare two discovery imports
+
+Use fresh output paths for both synthetic observations:
+
+```bash
+python -m database.inventory_cli examples/osquery-system-info.json --scope synthetic \
+  --observed-at 2026-10-19T00:00:00Z --output /tmp/zero-shadow-inventory-base.sqlite
+python -m database.inventory_cli examples/osquery-system-info-expanded.json --scope synthetic \
+  --observed-at 2026-10-19T01:00:00Z --output /tmp/zero-shadow-inventory-current.sqlite
+python -m database.inventory_diff_cli /tmp/zero-shadow-inventory-base.sqlite \
+  /tmp/zero-shadow-inventory-current.sqlite
+```
+
+Expect counts `base_assets: 1`, `current_assets: 2`, `added: 1`, `shared: 1`,
+`not_observed: 0`, and `changed_shared: 0`. The expanded fixture adds one fabricated
+worker identity. Dates belong to the synthetic exercise, not a live discovery run.
+
+The comparer opens both owned or trusted local databases read-only, reconciles each
+receipt with its stored rows, and requires matching source and claimed scope. Current
+observation time cannot precede the base. Equal times are allowed. The caller must
+select imports for the same authorized population; matching scope labels do not prove
+that two exports cover the same fleet or permission boundary.
+
+Added and not-observed IDs describe these two source-claimed inventories only.
+Absence does not prove a machine was deleted, remediated, or even included in both
+collections. Shared-identity comparison ignores import timestamps and compares
+retained payloads and asset metadata instead. Different byte digests can reflect only
+formatting, so `source_bytes_changed` is separate from identity changes. Changes to
+correlation keys can change an asset ID; this is not attestation of physical identity
+or an automatic host-rename match. No vulnerability, risk, owner, or action is inferred.
+
+The report includes receipt and recorded input digests, times, counts, and sorted IDs,
+not raw observations or hostnames. It does not reopen original exports; use the
+receipt command with `--export` separately for that check. Corrupt or incompatible
+receipts, legacy databases without receipts, reversed time, and read errors exit 2
+with no partial success document. `--output NEW_FILE` uses private exclusive JSON
+publication; otherwise stdout privacy is the caller's responsibility. Hashes and
+receipt consistency do not prevent privileged evidence replacement.
+
 ## Limits and failure behavior
 
 - Scope must be explicitly `synthetic`, `owned`, or `authorized`. This is a caller

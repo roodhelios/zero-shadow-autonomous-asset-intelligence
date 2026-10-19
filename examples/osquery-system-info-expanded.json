@@ -1,0 +1,4 @@
+[
+  {"hostname": "checkout.example.test", "uuid": "11111111-2222-4333-8444-555555555555"},
+  {"hostname": "worker.example.test", "uuid": "11111111-2222-4333-8444-666666666666"}
+]

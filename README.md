@@ -146,6 +146,11 @@ python -m database.inventory_receipt /tmp/zero-shadow-inventory.sqlite \
 Expect `status: consistent` and `original_export_checked: true`. This checks internal
 consistency and the retained bytes, not the truth of source claims or authorization.
 
+Compare two retained imports with
+`python -m database.inventory_diff_cli BASE.sqlite CURRENT.sqlite`.
+The [worked comparison](docs/osquery-import.md#compare-two-discovery-imports) shows
+new, shared, and not-observed identities without inventing deletion or risk claims.
+
 | Need | Entry point |
 | --- | --- |
 | Read stored evidence | `python -m database.evidence_reader_cli --help` |
