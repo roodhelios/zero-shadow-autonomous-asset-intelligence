@@ -162,6 +162,31 @@ python -m database.inventory_receipt /tmp/zero-shadow-inventory.sqlite \
 Expect `status: consistent` and `original_export_checked: true`. This checks internal
 consistency and the retained bytes, not the truth of source claims or authorization.
 
+Export the complete retained batch without copying asset IDs into separate commands:
+
+```bash
+python -m database.inventory_cli examples/osquery-system-info-expanded.json --scope synthetic \
+  --observed-at 2026-10-20T00:00:00Z --output /tmp/zero-shadow-two-hosts.sqlite
+python -m database.inventory_export_cli /tmp/zero-shadow-two-hosts.sqlite \
+  --export examples/osquery-system-info-expanded.json --output /tmp/zero-shadow-two-hosts.json
+```
+
+Use fresh paths on POSIX. Expect `report_type: retained-inventory`, `asset_count: 2`,
+`observation_count: 2`, and two asset snapshots with empty finding, ownership, and
+remediation arrays. Each snapshot keeps its evidence digest. The reconciled receipt
+reports `original_export_checked: true`; without `--export`, that value is explicitly
+false. Reading and reconciliation share one read-only SQLite transaction.
+The export preserves any existing linked decisions but never invents missing ones.
+Exit 0 means the complete batch was exported; exit 2 publishes no new output.
+
+The receipt binds retained identities and observation metadata to the imported batch.
+Only supplying the original export also checks exact input bytes and observation
+payloads against that source. Neither mode authenticates the collector or establishes
+that all hosts in an environment were collected. This command supports databases
+created by `inventory_cli` with an import receipt, not arbitrary workflow databases.
+Authorized hostnames and evidence can be sensitive: use `--output` for a private
+0600 file outside Git. Omitting it prints the complete evidence to stdout.
+
 Compare two retained imports with
 `python -m database.inventory_diff_cli BASE.sqlite CURRENT.sqlite`.
 The [worked comparison](docs/osquery-import.md#compare-two-discovery-imports) shows
