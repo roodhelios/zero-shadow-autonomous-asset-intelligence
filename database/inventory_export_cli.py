@@ -40,6 +40,36 @@ def export_inventory(database: Path, *, export_data: bytes | None = None) -> dic
         }
 
 
+def review_summary(result: dict) -> str:
+    """Summarize an export already reconstructed and reconciled by this module."""
+    reconciliation = result["import_reconciliation"]
+    receipt = reconciliation["receipt"]
+    # Quote all supplied strings so newlines and terminal controls stay visible.
+    def quote(value):
+        return json.dumps(value, ensure_ascii=True)
+    lines = [
+        f"Retained inventory: {result['asset_count']} assets, {result['observation_count']} observations",
+        f"Claimed scope: {quote(receipt['scope'])}",
+        f"Observed at: {quote(receipt['observed_at'])}",
+        f"Receipt: {quote(reconciliation['status'])}",
+        "Original export: " + ("checked" if reconciliation["original_export_checked"] else "not checked"),
+    ]
+    for item in result["assets"]:
+        asset = item["asset"]
+        findings = len(item["findings"])
+        ownership = len(item["ownership_decisions"])
+        plans = len(item["remediation_plans"])
+        lines.extend((
+            f"Asset: {quote(asset['asset_id'])}, hostname {quote(asset['primary_hostname'])}",
+            f"  Observations: {len(item['observations'])}",
+            f"  Findings: {findings}" + (" (not assessed by this import)" if not findings else " (retained records)"),
+            f"  Ownership decisions: {ownership}; remediation plans: {plans}",
+        ))
+    lines.append("Inventory review only. Missing decisions do not mean safe, assigned, or remediated.")
+    lines.append("Use JSON for linked records and digests. No collector authentication or complete coverage is established.")
+    return "\n".join(lines) + "\n"
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("database", type=Path)
@@ -47,13 +77,16 @@ def main(argv=None) -> int:
                         help="optionally verify against the original saved osquery export")
     parser.add_argument("--output", type=Path,
                         help="publish a new private file instead of printing to stdout")
+    parser.add_argument("--format", choices=("json", "text"), default="json",
+                        help="complete JSON (default) or a concise analyst review")
     args = parser.parse_args(argv)
     try:
         if args.output and os.name != "posix":
             raise ValueError("private inventory publication requires POSIX")
         result = export_inventory(args.database,
                                   export_data=_read(args.export) if args.export else None)
-        rendered = json.dumps(result, sort_keys=True, indent=2, allow_nan=False) + "\n"
+        rendered = (review_summary(result) if args.format == "text"
+                    else json.dumps(result, sort_keys=True, indent=2, allow_nan=False) + "\n")
         if args.output:
             _publish(args.output, rendered)
         else:

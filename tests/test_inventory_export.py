@@ -11,7 +11,7 @@ from io import StringIO
 from pathlib import Path
 
 from database.inventory_cli import store_export
-from database.inventory_export_cli import export_inventory, main
+from database.inventory_export_cli import export_inventory, main, review_summary
 
 FIXTURE = Path(__file__).resolve().parents[1] / "examples/osquery-system-info-expanded.json"
 
@@ -60,6 +60,66 @@ class InventoryExportTests(unittest.TestCase):
         with redirect_stdout(output):
             self.assertEqual(main([str(self.path)]), 0)
         self.assertFalse(json.loads(output.getvalue())["import_reconciliation"]["original_export_checked"])
+
+    def test_text_summary_lists_every_host_without_inventing_assessment(self):
+        before = self.path.read_bytes()
+        output = StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(main([str(self.path), "--export", str(FIXTURE), "--format", "text"]), 0)
+        text = output.getvalue()
+        self.assertIn("Retained inventory: 2 assets, 2 observations", text)
+        self.assertIn('Claimed scope: "synthetic"', text)
+        self.assertIn('Observed at: "2026-10-20T00:00:00Z"', text)
+        self.assertIn("Original export: checked", text)
+        for asset_id in self.receipt["asset_ids"]:
+            self.assertIn(asset_id, text)
+        self.assertIn('"checkout.example.test"', text)
+        self.assertIn('"worker.example.test"', text)
+        self.assertEqual(text.count("Findings: 0 (not assessed by this import)"), 2)
+        self.assertEqual(text.count("Ownership decisions: 0; remediation plans: 0"), 2)
+        self.assertNotIn("payload", text)
+        self.assertEqual(before, self.path.read_bytes())
+
+    def test_text_output_is_private_exclusive_and_marks_unchecked_source(self):
+        output = self.path.with_suffix(".txt")
+        self.assertEqual(main([str(self.path), "--format", "text", "--output", str(output)]), 0)
+        before = output.read_bytes()
+        self.assertIn(b"Original export: not checked", before)
+        self.assertEqual(output.stat().st_mode & 0o777, 0o600)
+        with redirect_stderr(StringIO()):
+            self.assertEqual(main([str(self.path), "--format", "text", "--output", str(output)]), 2)
+        self.assertEqual(output.read_bytes(), before)
+
+    def test_summary_quotes_terminal_controls_and_does_not_call_retained_findings_safe(self):
+        result = export_inventory(self.path)
+        result["assets"][0]["asset"]["primary_hostname"] = "host\n\x1b[31m\u202e"
+        result["assets"][0]["findings"] = [{"private": "not-rendered"}]
+        text = review_summary(result)
+        self.assertIn('hostname "host\\n\\u001b[31m\\u202e"', text)
+        self.assertNotIn("\x1b", text)
+        self.assertNotIn("\u202e", text)
+        self.assertIn("Findings: 1 (retained records)", text)
+        self.assertNotIn("not-rendered", text)
+
+    def test_json_default_is_unchanged_and_explicit_json_matches(self):
+        outputs = []
+        for extra in ([], ["--format", "json"]):
+            output = StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(main([str(self.path), *extra]), 0)
+            outputs.append(output.getvalue())
+        expected = json.dumps(export_inventory(self.path), sort_keys=True, indent=2, allow_nan=False) + "\n"
+        self.assertEqual(outputs, [expected, expected])
+
+    def test_failed_reconciliation_emits_no_text_or_output(self):
+        with sqlite3.connect(self.path) as connection:
+            connection.execute("DROP TABLE inventory_import_receipt")
+        output = self.path.with_suffix(".txt")
+        stdout = StringIO()
+        with redirect_stdout(stdout), redirect_stderr(StringIO()):
+            self.assertEqual(main([str(self.path), "--format", "text", "--output", str(output)]), 2)
+        self.assertEqual(stdout.getvalue(), "")
+        self.assertFalse(output.exists())
 
     def test_source_mismatch_receipt_corruption_and_missing_receipt_publish_nothing(self):
         wrong = self.path.with_suffix(".source.json")

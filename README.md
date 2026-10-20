@@ -187,6 +187,37 @@ created by `inventory_cli` with an import receipt, not arbitrary workflow databa
 Authorized hostnames and evidence can be sensitive: use `--output` for a private
 0600 file outside Git. Omitting it prints the complete evidence to stdout.
 
+For a readable review of that same batch, without opening the full JSON:
+
+```bash
+python -m database.inventory_export_cli /tmp/zero-shadow-two-hosts.sqlite \
+  --export examples/osquery-system-info-expanded.json --format text
+```
+
+Selected output:
+
+```text
+Retained inventory: 2 assets, 2 observations
+Claimed scope: "synthetic"
+Observed at: "2026-10-20T00:00:00Z"
+Receipt: "consistent"
+Original export: checked
+Asset: "asset-752c9c1b37e66798", hostname "checkout.example.test"
+  Observations: 1
+  Findings: 0 (not assessed by this import)
+  Ownership decisions: 0; remediation plans: 0
+```
+
+The full summary also lists the worker host in stable asset-ID order. It reads and
+verifies the same evidence as JSON mode before rendering any text. Without
+`--export`, it says `Original export: not checked`. Zero findings do not establish a
+clean host, and absent ownership or remediation records are not inferred decisions.
+Existing findings, ownership decisions, and plans are counted, not rescored.
+The text is a review aid, not a replacement evidence contract: keep JSON for linked
+records, decision details, and digests. Supplied strings are JSON-quoted so terminal
+control characters stay escaped. Hostnames can still be sensitive. Add `--output`
+with a new path to retain a private text file; JSON remains the default.
+
 Compare two retained imports with
 `python -m database.inventory_diff_cli BASE.sqlite CURRENT.sqlite`.
 The [worked comparison](docs/osquery-import.md#compare-two-discovery-imports) shows
