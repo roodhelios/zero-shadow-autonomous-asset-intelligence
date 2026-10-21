@@ -70,6 +70,41 @@ def review_summary(result: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
+def coverage_summary(result: dict) -> dict:
+    """Return aggregate record coverage without asset or evidence identifiers."""
+    assets = result["assets"]
+
+    def count_with(field):
+        return sum(bool(item[field]) for item in assets)
+
+    findings = count_with("findings")
+    ownership = count_with("ownership_decisions")
+    remediation = count_with("remediation_plans")
+    reconciliation = result["import_reconciliation"]
+    return {
+        "schema_version": 1,
+        "report_type": "inventory-coverage-summary",
+        "asset_count": result["asset_count"],
+        "observation_count": result["observation_count"],
+        "receipt_status": reconciliation["status"],
+        "original_export_checked": reconciliation["original_export_checked"],
+        "record_coverage": {
+            "assets_with_findings": findings,
+            "assets_without_findings": len(assets) - findings,
+            "assets_with_ownership_decisions": ownership,
+            "assets_without_ownership_decisions": len(assets) - ownership,
+            "assets_with_remediation_plans": remediation,
+            "assets_without_remediation_plans": len(assets) - remediation,
+        },
+        "identifiers_included": False,
+        "evidence_included": False,
+        "interpretation": (
+            "Counts describe retained records only. Missing records do not mean an asset "
+            "is safe, assigned, or remediated."
+        ),
+    }
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("database", type=Path)
@@ -77,16 +112,19 @@ def main(argv=None) -> int:
                         help="optionally verify against the original saved osquery export")
     parser.add_argument("--output", type=Path,
                         help="publish a new private file instead of printing to stdout")
-    parser.add_argument("--format", choices=("json", "text"), default="json",
-                        help="complete JSON (default) or a concise analyst review")
+    parser.add_argument("--format", choices=("json", "text", "coverage"), default="json",
+                        help="complete JSON (default), analyst text, or aggregate coverage JSON")
     args = parser.parse_args(argv)
     try:
         if args.output and os.name != "posix":
             raise ValueError("private inventory publication requires POSIX")
         result = export_inventory(args.database,
                                   export_data=_read(args.export) if args.export else None)
-        rendered = (review_summary(result) if args.format == "text"
-                    else json.dumps(result, sort_keys=True, indent=2, allow_nan=False) + "\n")
+        if args.format == "text":
+            rendered = review_summary(result)
+        else:
+            document = coverage_summary(result) if args.format == "coverage" else result
+            rendered = json.dumps(document, sort_keys=True, indent=2, allow_nan=False) + "\n"
         if args.output:
             _publish(args.output, rendered)
         else:

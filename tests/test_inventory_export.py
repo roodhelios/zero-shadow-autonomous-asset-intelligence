@@ -11,7 +11,7 @@ from io import StringIO
 from pathlib import Path
 
 from database.inventory_cli import store_export
-from database.inventory_export_cli import export_inventory, main, review_summary
+from database.inventory_export_cli import coverage_summary, export_inventory, main, review_summary
 
 FIXTURE = Path(__file__).resolve().parents[1] / "examples/osquery-system-info-expanded.json"
 
@@ -110,6 +110,52 @@ class InventoryExportTests(unittest.TestCase):
             outputs.append(output.getvalue())
         expected = json.dumps(export_inventory(self.path), sort_keys=True, indent=2, allow_nan=False) + "\n"
         self.assertEqual(outputs, [expected, expected])
+
+    def test_coverage_summary_reports_only_aggregate_record_presence(self):
+        result = export_inventory(self.path, export_data=FIXTURE.read_bytes())
+        result["assets"][0]["findings"] = [{"finding_id": "not-published"}]
+        result["assets"][0]["ownership_decisions"] = [{"team": "not-published"}]
+        result["assets"][1]["remediation_plans"] = [{"plan_id": "not-published"}]
+
+        summary = coverage_summary(result)
+
+        self.assertEqual(summary["report_type"], "inventory-coverage-summary")
+        self.assertEqual(summary["asset_count"], 2)
+        self.assertEqual(summary["observation_count"], 2)
+        self.assertEqual(summary["receipt_status"], "consistent")
+        self.assertTrue(summary["original_export_checked"])
+        self.assertEqual(summary["record_coverage"], {
+            "assets_with_findings": 1,
+            "assets_without_findings": 1,
+            "assets_with_ownership_decisions": 1,
+            "assets_without_ownership_decisions": 1,
+            "assets_with_remediation_plans": 1,
+            "assets_without_remediation_plans": 1,
+        })
+        self.assertFalse(summary["identifiers_included"])
+        self.assertFalse(summary["evidence_included"])
+        rendered = json.dumps(summary)
+        for private in ("not-published", "checkout.example.test", *self.receipt["asset_ids"]):
+            self.assertNotIn(private, rendered)
+        self.assertIn("Missing records do not mean", summary["interpretation"])
+
+    def test_coverage_cli_uses_reconciled_database_without_identifiers(self):
+        output = StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(main([str(self.path), "--export", str(FIXTURE),
+                                   "--format", "coverage"]), 0)
+        document = json.loads(output.getvalue())
+        self.assertEqual(document["record_coverage"], {
+            "assets_with_findings": 0,
+            "assets_without_findings": 2,
+            "assets_with_ownership_decisions": 0,
+            "assets_without_ownership_decisions": 2,
+            "assets_with_remediation_plans": 0,
+            "assets_without_remediation_plans": 2,
+        })
+        self.assertTrue(document["original_export_checked"])
+        for private in ("checkout.example.test", "worker.example.test", *self.receipt["asset_ids"]):
+            self.assertNotIn(private, output.getvalue())
 
     def test_failed_reconciliation_emits_no_text_or_output(self):
         with sqlite3.connect(self.path) as connection:

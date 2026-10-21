@@ -218,6 +218,21 @@ records, decision details, and digests. Supplied strings are JSON-quoted so term
 control characters stay escaped. Hostnames can still be sensitive. Add `--output`
 with a new path to retain a private text file; JSON remains the default.
 
+When a reviewer needs coverage counts but should not receive hostnames, asset IDs,
+finding details, or evidence, request aggregate JSON instead:
+
+```bash
+python -m database.inventory_export_cli /tmp/zero-shadow-two-hosts.sqlite \
+  --export examples/osquery-system-info-expanded.json --format coverage
+```
+
+The fixture reports two assets without retained finding, ownership, or remediation
+records. It also states whether the original export was checked. The summary contains
+no asset or evidence identifiers and does not call missing records a clean result.
+It counts record presence only, not assessment quality, source truth, authorization,
+or discovery completeness. Complete JSON remains the evidence handoff when a reviewer
+needs the linked records and digests.
+
 Compare two retained imports with
 `python -m database.inventory_diff_cli BASE.sqlite CURRENT.sqlite`.
 The [worked comparison](docs/osquery-import.md#compare-two-discovery-imports) shows
