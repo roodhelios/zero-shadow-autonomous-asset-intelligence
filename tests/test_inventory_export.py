@@ -11,7 +11,13 @@ from io import StringIO
 from pathlib import Path
 
 from database.inventory_cli import store_export
-from database.inventory_export_cli import coverage_summary, export_inventory, main, review_summary
+from database.inventory_export_cli import (
+    coverage_summary,
+    export_inventory,
+    main,
+    review_record,
+    review_summary,
+)
 
 FIXTURE = Path(__file__).resolve().parents[1] / "examples/osquery-system-info-expanded.json"
 
@@ -156,6 +162,67 @@ class InventoryExportTests(unittest.TestCase):
         self.assertTrue(document["original_export_checked"])
         for private in ("checkout.example.test", "worker.example.test", *self.receipt["asset_ids"]):
             self.assertNotIn(private, output.getvalue())
+
+    def test_review_record_binds_note_and_normalized_time_to_coverage(self):
+        result = export_inventory(self.path, export_data=FIXTURE.read_bytes())
+        record = review_record(
+            result,
+            reviewed_at="2026-10-22T01:30:00-04:00",
+            reviewer_note="Checked retained record coverage before assessment handoff.",
+        )
+        self.assertEqual(record["report_type"], "inventory-review-record")
+        self.assertEqual(record["reviewed_at"], "2026-10-22T05:30:00Z")
+        self.assertEqual(len(record["review_sha256"]), 64)
+        self.assertEqual(record["coverage_summary"], coverage_summary(result))
+        self.assertFalse(record["coverage_summary"]["identifiers_included"])
+        self.assertFalse(record["coverage_summary"]["evidence_included"])
+        self.assertIn("does not authenticate", record["interpretation"])
+        changed = review_record(
+            result,
+            reviewed_at="2026-10-22T01:30:00-04:00",
+            reviewer_note="A different review note.",
+        )
+        self.assertNotEqual(record["review_sha256"], changed["review_sha256"])
+
+    def test_review_cli_is_deterministic_and_keeps_identifiers_out(self):
+        args = [
+            str(self.path),
+            "--export", str(FIXTURE),
+            "--format", "review",
+            "--reviewed-at", "2026-10-22T05:30:00Z",
+            "--reviewer-note", "Coverage checked for synthetic handoff.",
+        ]
+        outputs = []
+        for _ in range(2):
+            output = StringIO()
+            with redirect_stdout(output):
+                self.assertEqual(main(args), 0)
+            outputs.append(output.getvalue())
+        self.assertEqual(outputs[0], outputs[1])
+        document = json.loads(outputs[0])
+        self.assertTrue(document["coverage_summary"]["original_export_checked"])
+        for private in (
+            "checkout.example.test",
+            "worker.example.test",
+            *self.receipt["asset_ids"],
+        ):
+            self.assertNotIn(private, outputs[0])
+
+    def test_review_metadata_validation_fails_without_output(self):
+        invalid = (
+            ["--format", "review"],
+            ["--format", "review", "--reviewed-at", "2026-10-22T05:30:00Z",
+             "--reviewer-note", "line one\nline two"],
+            ["--format", "review", "--reviewed-at", "2026-10-22T05:30:00",
+             "--reviewer-note", "Missing timezone."],
+            ["--format", "coverage", "--reviewer-note", "Wrong format."],
+        )
+        for extra in invalid:
+            with self.subTest(extra=extra):
+                stdout = StringIO()
+                with redirect_stdout(stdout), redirect_stderr(StringIO()):
+                    self.assertEqual(main([str(self.path), *extra]), 2)
+                self.assertEqual(stdout.getvalue(), "")
 
     def test_failed_reconciliation_emits_no_text_or_output(self):
         with sqlite3.connect(self.path) as connection:

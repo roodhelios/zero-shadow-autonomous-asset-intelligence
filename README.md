@@ -233,6 +233,21 @@ It counts record presence only, not assessment quality, source truth, authorizat
 or discovery completeness. Complete JSON remains the evidence handoff when a reviewer
 needs the linked records and digests.
 
+Record a reproducible review checkpoint for the same metadata-only summary:
+
+```bash
+python -m database.inventory_export_cli /tmp/zero-shadow-two-hosts.sqlite \
+  --export examples/osquery-system-info-expanded.json --format review \
+  --reviewed-at 2026-10-22T05:30:00Z \
+  --reviewer-note "Coverage checked for synthetic handoff."
+```
+
+The review record normalizes the timestamp to UTC and binds the time, note, and exact
+included coverage summary with `review_sha256`. It still excludes
+asset IDs, hostnames, findings, and evidence. The time and note are caller claims, not
+proof of reviewer identity or approval. Notes are limited to 500 printable characters.
+Use a private `--output` path if the note should not appear in terminal history.
+
 Compare two retained imports with
 `python -m database.inventory_diff_cli BASE.sqlite CURRENT.sqlite`.
 The [worked comparison](docs/osquery-import.md#compare-two-discovery-imports) shows

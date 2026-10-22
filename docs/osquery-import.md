@@ -162,6 +162,29 @@ with no partial success document. `--output NEW_FILE` uses private exclusive JSO
 publication; otherwise stdout privacy is the caller's responsibility. Hashes and
 receipt consistency do not prevent privileged evidence replacement.
 
+## Record an inventory coverage review
+
+After exporting a metadata-only coverage summary, a reviewer can retain a separate
+checkpoint without copying hostnames, asset IDs, finding details, or evidence:
+
+```bash
+python -m database.inventory_export_cli /tmp/zero-shadow-two-hosts.sqlite \
+  --export examples/osquery-system-info-expanded.json --format review \
+  --reviewed-at 2026-10-22T05:30:00Z \
+  --reviewer-note "Coverage checked for synthetic handoff."
+```
+
+The record contains the complete coverage summary and a SHA-256 digest of canonical
+review time, note, and summary JSON. Repeating the command with the same reconciled
+database and metadata produces the same document. The review time must include a UTC offset and is
+normalized to `Z`. Notes must be 1 to 500 printable characters with no surrounding
+whitespace.
+
+This record says that a caller attached metadata to one exact summary. It is not a
+signature, reviewer authentication, approval, attestation, or evidence that missing
+assessment records represent safe assets. Notes can still contain sensitive text, so
+prefer a private new `--output` file instead of stdout for non-fixture reviews.
+
 ## Limits and failure behavior
 
 - Scope must be explicitly `synthetic`, `owned`, or `authorized`. This is a caller
