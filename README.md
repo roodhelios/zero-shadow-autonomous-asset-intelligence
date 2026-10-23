@@ -239,14 +239,35 @@ Record a reproducible review checkpoint for the same metadata-only summary:
 python -m database.inventory_export_cli /tmp/zero-shadow-two-hosts.sqlite \
   --export examples/osquery-system-info-expanded.json --format review \
   --reviewed-at 2026-10-22T05:30:00Z \
-  --reviewer-note "Coverage checked for synthetic handoff."
+  --reviewer-note "Coverage checked for synthetic handoff." \
+  --output /tmp/zero-shadow-review.json
 ```
 
 The review record normalizes the timestamp to UTC and binds the time, note, and exact
 included coverage summary with `review_sha256`. It still excludes
 asset IDs, hostnames, findings, and evidence. The time and note are caller claims, not
 proof of reviewer identity or approval. Notes are limited to 500 printable characters.
-Use a private `--output` path if the note should not appear in terminal history.
+Use a private `--output` path to keep the note out of terminal output. Command-line
+arguments may still be recorded in shell history.
+
+Check that saved record against freshly reconstructed coverage in another process:
+
+```bash
+python -m database.inventory_review_verify /tmp/zero-shadow-two-hosts.sqlite \
+  /tmp/zero-shadow-review.json --export examples/osquery-system-info-expanded.json
+```
+
+Expect `status: consistent`, `asset_count: 2`, and `original_export_checked: true`.
+The verifier recomputes coverage and the review digest before reporting success.
+An edited note, stale coverage, malformed record, or different source bytes exits 2
+without a success document. Supply `--export` if it was used to create the review;
+the checked/unchecked source state is part of the saved coverage summary.
+
+This comparison does not authenticate the reviewer or identify a particular batch.
+Two different inventories with identical coverage counts can match the same review.
+Use the complete inventory export and its retained input receipt when identity matters.
+Verification output includes the review digest and aggregate counts, without the note,
+hostnames, asset IDs, or evidence payloads. The review JSON input is bounded to 16 KiB.
 
 Compare two retained imports with
 `python -m database.inventory_diff_cli BASE.sqlite CURRENT.sqlite`.
