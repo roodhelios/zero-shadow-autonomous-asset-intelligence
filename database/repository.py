@@ -196,87 +196,7 @@ class EvidenceRepository:
                         _json(observation.to_dict()),
                     ),
                 )
-            self.connection.execute(
-                """
-                INSERT INTO findings
-                    (finding_id, asset_id, source, description, severity, exposure,
-                     exploit_evidence, control_state, identity_confidence, evidence_json,
-                     observed_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    finding.finding_id,
-                    finding.asset_id,
-                    finding.source,
-                    finding.description,
-                    finding.severity,
-                    finding.exposure,
-                    finding.exploit_evidence,
-                    finding.control_state,
-                    finding.identity_confidence,
-                    _json(
-                        {
-                            "source": finding.source,
-                            "description": finding.description,
-                            "severity": finding.severity,
-                            "exposure": finding.exposure,
-                            "exploit_evidence": finding.exploit_evidence,
-                            "control_state": finding.control_state,
-                            "identity_confidence": finding.identity_confidence,
-                        }
-                    ),
-                    observed_at,
-                ),
-            )
-            self.connection.execute(
-                """
-                INSERT INTO ownership_decisions
-                    (decision_id, asset_id, status, team_id, matched_rule_ids_json,
-                     candidate_team_ids_json, explanation, decided_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    bundle.decision_id,
-                    asset.asset_id,
-                    ownership.status,
-                    ownership.team_id,
-                    _json(list(ownership.matched_rule_ids)),
-                    _json(list(ownership.candidate_team_ids)),
-                    ownership.explanation,
-                    decided_at,
-                ),
-            )
-            factors = [
-                {"kind": "risk", **factor.to_dict()}
-                for factor in plan.risk_assessment.factors
-            ] + [
-                {"kind": "priority", **factor.to_dict()}
-                for factor in plan.priority_factors
-            ]
-            self.connection.execute(
-                """
-                INSERT INTO remediation_plans
-                    (plan_id, finding_id, plan_version, priority, owner_team_id,
-                     opened_on, due_date, overdue, risk_score, risk_band, actions_json,
-                     factors_json, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    bundle.plan_id,
-                    finding.finding_id,
-                    bundle.plan_version,
-                    plan.priority,
-                    plan.owner,
-                    plan.opened_on.isoformat(),
-                    plan.due_date.isoformat(),
-                    int(plan.overdue),
-                    plan.risk_assessment.score,
-                    plan.risk_assessment.band,
-                    _json(list(plan.actions)),
-                    _json(factors),
-                    created_at,
-                ),
-            )
+            self._store_decisions(bundle)
 
         return EvidenceWriteResult(
             asset_id=asset.asset_id,
@@ -286,3 +206,110 @@ class EvidenceRepository:
             plan_id=bundle.plan_id,
             plan_version=bundle.plan_version,
         )
+
+
+    def _store_decisions(self, bundle: EvidenceBundle, *, finding_time: datetime | None = None) -> None:
+        finding, ownership, plan = bundle.finding, bundle.ownership, bundle.plan
+        observed_at = _timestamp(finding_time or bundle.observed_at, "observed_at")
+        decided_at = _timestamp(bundle.decided_at, "decided_at")
+        created_at = _timestamp(bundle.created_at, "created_at")
+        self.connection.execute(
+            """
+            INSERT INTO findings
+                (finding_id, asset_id, source, description, severity, exposure,
+                 exploit_evidence, control_state, identity_confidence, evidence_json,
+                 observed_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                finding.finding_id,
+                finding.asset_id,
+                finding.source,
+                finding.description,
+                finding.severity,
+                finding.exposure,
+                finding.exploit_evidence,
+                finding.control_state,
+                finding.identity_confidence,
+                _json(
+                    {
+                        "source": finding.source,
+                        "description": finding.description,
+                        "severity": finding.severity,
+                        "exposure": finding.exposure,
+                        "exploit_evidence": finding.exploit_evidence,
+                        "control_state": finding.control_state,
+                        "identity_confidence": finding.identity_confidence,
+                    }
+                ),
+                observed_at,
+            ),
+        )
+        self.connection.execute(
+            """
+            INSERT INTO ownership_decisions
+                (decision_id, asset_id, status, team_id, matched_rule_ids_json,
+                 candidate_team_ids_json, explanation, decided_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                bundle.decision_id,
+                bundle.asset.asset_id,
+                ownership.status,
+                ownership.team_id,
+                _json(list(ownership.matched_rule_ids)),
+                _json(list(ownership.candidate_team_ids)),
+                ownership.explanation,
+                decided_at,
+            ),
+        )
+        factors = [
+            {"kind": "risk", **factor.to_dict()}
+            for factor in plan.risk_assessment.factors
+        ] + [
+            {"kind": "priority", **factor.to_dict()}
+            for factor in plan.priority_factors
+        ]
+        self.connection.execute(
+            """
+            INSERT INTO remediation_plans
+                (plan_id, finding_id, plan_version, priority, owner_team_id,
+                 opened_on, due_date, overdue, risk_score, risk_band, actions_json,
+                 factors_json, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                bundle.plan_id,
+                finding.finding_id,
+                bundle.plan_version,
+                plan.priority,
+                plan.owner,
+                plan.opened_on.isoformat(),
+                plan.due_date.isoformat(),
+                int(plan.overdue),
+                plan.risk_assessment.score,
+                plan.risk_assessment.band,
+                _json(list(plan.actions)),
+                _json(factors),
+                created_at,
+            ),
+        )
+
+    def store_assessments(self, bundles: tuple[EvidenceBundle, ...]) -> None:
+        """Append linked decisions atomically without rewriting discovery observations."""
+        for bundle in bundles:
+            bundle.validate()
+        with self.connection:
+            for bundle in bundles:
+                rows = self.connection.execute(
+                    "SELECT source, source_record_id, scope, observed_at, payload_json "
+                    "FROM asset_observations WHERE asset_id = ? ORDER BY source, source_record_id",
+                    (bundle.asset.asset_id,),
+                ).fetchall()
+                expected = sorted((item.source, item.source_record_id, bundle.scope,
+                    _timestamp(bundle.observed_at, "observed_at"), _json(item.to_dict()))
+                    for item in bundle.asset.observations)
+                if rows != expected:
+                    raise EvidenceRepositoryError("assessment must match retained discovery observations")
+                # Supplied assessment time is not the older inventory collection time.
+                self._store_decisions(bundle, finding_time=bundle.decided_at)

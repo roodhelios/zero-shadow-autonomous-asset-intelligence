@@ -162,3 +162,17 @@ independently controlled digest store before using a diff for enforcement.
   replace the database file or alter the schema.
 - Snapshot digests expose changed files but do not authenticate the exporter.
 - No retention, encryption, backup, or access-control policy is implemented here.
+
+
+## First retained inventory assessment
+
+`database.inventory_assessment_cli` reconstructs reconciled discovery in a new private
+SQLite database and uses the existing finding, ownership and remediation planner.
+`EvidenceRepository.store_assessments` checks every bundle against retained source
+observations, then inserts all finding/ownership/plan rows in one transaction without
+rewriting inventory. A synthetic failure on the second bundle verifies rollback of all
+three decision tables. Original inventory bytes remain unchanged. The original bundle
+writer shares the same decision SQL; its existing transaction tests remain required.
+The new file also retains exact reviewed inputs, dates and inventory binding before
+exclusive publication. This is a first-assessment workflow, not versioned reassessment,
+reviewer attestation, deployed discovery or automatic remediation.

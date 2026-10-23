@@ -380,6 +380,48 @@ unchanged when `--baseline-as-of` is omitted. Equal dates produce no changes; a
 baseline later than the current review or earlier than a finding's opened date fails
 without publishing output. Dates belong to the selected exercise, not live telemetry.
 
+## Retain a reviewed inventory assessment
+
+The inventory queue command remains read-only. To retain its supplied findings,
+ownership decisions and plans, create a separate first-assessment database:
+
+```bash
+python -m database.inventory_assessment_cli /tmp/zero-shadow-queue-inventory.sqlite \
+  examples/inventory-findings.jsonl --directory examples/ownership-directory.json \
+  --as-of 2026-10-23 --assessed-at 2026-10-23T01:00:00Z \
+  --export examples/osquery-system-info-expanded.json \
+  --output /tmp/zero-shadow-assessed.sqlite
+python -m database.inventory_export_cli /tmp/zero-shadow-assessed.sqlite \
+  --export examples/osquery-system-info-expanded.json
+```
+
+Use the discovery-only database prepared in the inventory queue quickstart above and
+fresh output paths. Expect `assessment_stored`, one finding, one assessed asset and
+two inventory assets. The export now contains one linked finding, ownership decision
+for `cloud-platform`, and P0 remediation plan. The other asset remains unassessed.
+The original database is unchanged. No ticket or remediation action is sent.
+
+The command reconstructs the reconciled inventory in a new private database using the
+committed schema. It checks that discovery reconstruction is exact, validates all
+finding references with the existing queue planner, and inserts all decisions in one
+SQLite transaction. A failure in any decision rolls them all back. Only a complete,
+validated database is published to a fresh 0600 path. It never copies an input database's
+schema or triggers. Retained `inventory_assessment_input` rows preserve exact finding
+JSON Lines, ownership-directory JSON, review date, assessment time, original inventory
+binding and input digests. These inputs and assessment records are append-only under
+the supplied schema. Treat the new database as sensitive evidence and keep it outside Git.
+
+`assessed-at` is a caller-supplied UTC-offset time at or after inventory observation.
+It timestamps the supplied finding assessment and ownership decision, not an independently
+measured detection. `as-of` remains the planner's explicit review date. Scope, finding
+facts, tags, times and ownership policy remain claims. Retention does not establish
+accepted ownership, authenticated provenance, live exploitability, or remediation.
+Only the first nonempty assessment of discovery-only inventory is supported. Existing
+decisions, empty findings, unknown assets, duplicate IDs and changed retained exports
+fail without publishing output. Later assessment versions, reviewer authentication,
+retention policies and PostgreSQL support remain unfinished. A database administrator
+can replace files or alter schema; append-only triggers do not prevent that.
+
 ## Status and next work
 
 The local fixture pipeline and saved osquery JSON import work. AWS and network
