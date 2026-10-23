@@ -107,7 +107,8 @@ def coverage_summary(result: dict) -> dict:
     }
 
 
-def review_record(result: dict, *, reviewed_at: str, reviewer_note: str) -> dict:
+def review_record(result: dict, *, reviewed_at: str, reviewer_note: str,
+                  bind_batch: bool = False) -> dict:
     """Bind a caller-supplied review checkpoint to an exact coverage summary."""
     try:
         parsed = datetime.fromisoformat(reviewed_at.replace("Z", "+00:00"))
@@ -127,6 +128,10 @@ def review_record(result: dict, *, reviewed_at: str, reviewer_note: str) -> dict
         "reviewer_note": reviewer_note,
         "coverage_summary": summary,
     }
+    if bind_batch:
+        batch = json.dumps(result, sort_keys=True, separators=(",", ":"),
+                           ensure_ascii=True, allow_nan=False).encode("ascii")
+        review_payload["batch_sha256"] = hashlib.sha256(batch).hexdigest()
     canonical = json.dumps(
         review_payload,
         sort_keys=True,
@@ -134,8 +139,8 @@ def review_record(result: dict, *, reviewed_at: str, reviewer_note: str) -> dict
         ensure_ascii=True,
         allow_nan=False,
     ).encode("ascii")
-    return {
-        "schema_version": 1,
+    record = {
+        "schema_version": 2 if bind_batch else 1,
         "report_type": "inventory-review-record",
         "reviewed_at": normalized_time,
         "reviewer_note": reviewer_note,
@@ -146,6 +151,14 @@ def review_record(result: dict, *, reviewed_at: str, reviewer_note: str) -> dict
             "to the included coverage summary but does not authenticate the reviewer."
         ),
     }
+    if bind_batch:
+        record["batch_sha256"] = review_payload["batch_sha256"]
+        record["interpretation"] = (
+            "The review time and note are caller-supplied metadata. The digests bind them "
+            "to the current inventory export and coverage summary but do not authenticate "
+            "the reviewer or source."
+        )
+    return record
 
 
 def main(argv=None) -> int:
@@ -162,6 +175,8 @@ def main(argv=None) -> int:
                         help="caller-supplied ISO 8601 review time for review format")
     parser.add_argument("--reviewer-note",
                         help="caller-supplied bounded note for review format")
+    parser.add_argument("--bind-batch", action="store_true",
+                        help="bind a version 2 review to the complete reconstructed inventory")
     args = parser.parse_args(argv)
     try:
         if args.output and os.name != "posix":
@@ -173,6 +188,8 @@ def main(argv=None) -> int:
             raise ValueError("review format requires reviewed-at and reviewer-note")
         if args.format != "review" and any(review_fields):
             raise ValueError("review metadata requires review format")
+        if args.bind_batch and args.format != "review":
+            raise ValueError("batch binding requires review format")
         if args.format == "text":
             rendered = review_summary(result)
         else:
@@ -183,6 +200,7 @@ def main(argv=None) -> int:
                     result,
                     reviewed_at=args.reviewed_at,
                     reviewer_note=args.reviewer_note,
+                    bind_batch=args.bind_batch,
                 )
             else:
                 document = result

@@ -269,6 +269,29 @@ Use the complete inventory export and its retained input receipt when identity m
 Verification output includes the review digest and aggregate counts, without the note,
 hostnames, asset IDs, or evidence payloads. The review JSON input is bounded to 16 KiB.
 
+When the handoff must identify the complete reconstructed batch, add `--bind-batch`:
+
+```bash
+python -m database.inventory_export_cli /tmp/zero-shadow-two-hosts.sqlite \
+  --export examples/osquery-system-info-expanded.json --format review --bind-batch \
+  --reviewed-at 2026-10-23T05:00:00Z --reviewer-note "Synthetic batch handoff." \
+  --output /tmp/zero-shadow-bound-review.json
+python -m database.inventory_review_verify /tmp/zero-shadow-two-hosts.sqlite \
+  /tmp/zero-shadow-bound-review.json --export examples/osquery-system-info-expanded.json \
+  --require-batch-binding
+```
+
+This produces a version 2 review with `batch_sha256` over the complete canonical
+inventory export, including observations, linked decisions, and the import receipt.
+The review digest also binds that batch digest. Verification reconstructs the same
+export and reports `batch_bound: true`; an inventory with equal counts but different
+content fails. It still publishes no raw identifiers or evidence, but its digest can
+correlate matching inventories. Treat it as sensitive metadata. Neither digest
+authenticates the reviewer or collector. Version 1 remains the default coverage-only
+record, and its documented equal-count limitation remains unchanged.
+Use `--require-batch-binding` in workflows that require version 2, so a coverage-only
+record cannot silently replace a batch-bound review.
+
 Compare two retained imports with
 `python -m database.inventory_diff_cli BASE.sqlite CURRENT.sqlite`.
 The [worked comparison](docs/osquery-import.md#compare-two-discovery-imports) shows
