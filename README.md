@@ -358,6 +358,28 @@ before publishing a result. Use fresh private output paths outside Git. `--outpu
 creates a complete 0600 file and never overwrites; omitting it prints sensitive queue
 content to stdout. Failure returns exit 2 with a fixed error and no success document.
 
+Compare date-driven urgency against an earlier review without changing inventory,
+finding facts, or ownership policy:
+
+```bash
+python -m engine.inventory_queue_cli /tmp/zero-shadow-queue-inventory.sqlite \
+  examples/inventory-findings.jsonl --directory examples/ownership-directory.json \
+  --as-of 2027-01-01 --baseline-as-of 2026-10-23 \
+  --export examples/osquery-system-info-expanded.json \
+  --output /tmp/zero-shadow-priority-comparison.json
+```
+
+The synthetic item becomes overdue at the later review date. `priority_comparison`
+shows one changed item, with previous/current priority and overdue status. A priority
+already at P0 cannot rise further, but a changed overdue state is still visible.
+Both plans use the same reconstructed inventory and in-memory assessment inputs;
+technical risk assessments, input digests, due dates, and inventory binding remain
+unchanged. This is not a comparison of different observations or proof of remediation.
+The current-date queues remain in the normal `queues` field. Default output is
+unchanged when `--baseline-as-of` is omitted. Equal dates produce no changes; a
+baseline later than the current review or earlier than a finding's opened date fails
+without publishing output. Dates belong to the selected exercise, not live telemetry.
+
 ## Status and next work
 
 The local fixture pipeline and saved osquery JSON import work. AWS and network
