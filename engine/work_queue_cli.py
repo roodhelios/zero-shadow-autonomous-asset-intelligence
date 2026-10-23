@@ -28,6 +28,27 @@ def _date(value: Any, field_name: str) -> date:
         raise ValueError(f"{field_name} must use YYYY-MM-DD") from exc
 
 
+def queue_item(record, *, directory, as_of):
+    """Apply the same reviewed finding, ownership, and priority rules to one record."""
+    if not isinstance(record, Mapping):
+        raise ValueError("record must be an object")
+    finding = record.get("finding")
+    if not isinstance(finding, Mapping):
+        raise ValueError("finding must be an object")
+    resolution = directory.resolve(record.get("asset_tags", {}))
+    requested_due = record.get("requested_due_date")
+    plan = plan_remediation(
+        score_finding(FindingEvidence.from_dict(finding)),
+        owner=resolution.team_id,
+        opened_on=_date(record.get("opened_on"), "opened_on"),
+        as_of=as_of,
+        requested_due_date=(
+            _date(requested_due, "requested_due_date") if requested_due is not None else None
+        ),
+    )
+    return QueueItem(plan=plan, ownership=resolution)
+
+
 def build_from_jsonl(
     source_path: str | Path,
     *,
@@ -35,7 +56,6 @@ def build_from_jsonl(
     as_of: date,
 ) -> dict[str, Any]:
     """Read local JSON Lines and return a deterministic queue document."""
-
     directory = load_directory(directory_path)
     source = Path(source_path)
     items: list[QueueItem] = []
@@ -44,34 +64,13 @@ def build_from_jsonl(
             if not line.strip():
                 continue
             try:
-                record = json.loads(line)
-                if not isinstance(record, Mapping):
-                    raise ValueError("record must be an object")
-                finding = record.get("finding")
-                if not isinstance(finding, Mapping):
-                    raise ValueError("finding must be an object")
-                tags = record.get("asset_tags", {})
-                resolution = directory.resolve(tags)
-                requested_due = record.get("requested_due_date")
-                plan = plan_remediation(
-                    score_finding(FindingEvidence.from_dict(finding)),
-                    owner=resolution.team_id,
-                    opened_on=_date(record.get("opened_on"), "opened_on"),
-                    as_of=as_of,
-                    requested_due_date=(
-                        _date(requested_due, "requested_due_date")
-                        if requested_due is not None
-                        else None
-                    ),
-                )
-                items.append(QueueItem(plan=plan, ownership=resolution))
+                items.append(queue_item(json.loads(line), directory=directory, as_of=as_of))
             except json.JSONDecodeError as exc:
                 raise WorkQueueInputError(
                     f"{source}:{line_number}: invalid JSON ({exc.msg})"
                 ) from exc
             except (FindingValidationError, OwnershipError, ValueError) as exc:
                 raise WorkQueueInputError(f"{source}:{line_number}: {exc}") from exc
-
     return build_work_queue_document(items, directory=directory, as_of=as_of)
 
 

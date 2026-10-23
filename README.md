@@ -313,6 +313,51 @@ Keep secret keys outside Git. HMAC provides shared-secret authentication, not in
 signer identity. Storage checks do not prove crash guarantees or protection from
 privileged users.
 
+## Plan findings against a retained inventory
+
+The standalone work-queue input can name arbitrary asset IDs. To require every
+finding to reference an asset in a reconciled osquery inventory, use the linked
+planner instead. From the repository root, create a fresh fixture inventory:
+
+```bash
+python -m database.inventory_cli examples/osquery-system-info-expanded.json \
+  --scope synthetic --observed-at 2026-10-23T00:00:00Z \
+  --output /tmp/zero-shadow-queue-inventory.sqlite
+python -m engine.inventory_queue_cli /tmp/zero-shadow-queue-inventory.sqlite \
+  examples/inventory-findings.jsonl --directory examples/ownership-directory.json \
+  --as-of 2026-10-23 --export examples/osquery-system-info-expanded.json \
+  --output /tmp/zero-shadow-inventory-queues.json
+```
+
+Expect two retained assets, one asset with a supplied finding, and one asset without
+supplied findings. The queue has one item assigned to `cloud-platform`. The planner
+uses the same risk, ownership, and remediation rules as `work_queue_cli`, without
+attaching the finding to the other imported host. Unknown asset references and
+duplicate finding IDs reject the whole output. Multiple distinct findings for one
+asset create separate items but count that asset once in coverage. Empty findings
+leave every asset unassessed and create no queue items.
+
+The input is JSON Lines with `finding`, `asset_tags`, and `opened_on`, plus optional
+`requested_due_date`, as in the included fixture. Finding asset IDs must match the
+retained inventory exactly. Tags are explicitly reviewed assessment inputs; they
+are not collected, inferred, or authenticated by osquery. Severity, exposure, exploit
+and control evidence also remain caller claims. Missing findings do not mean clean
+hosts, and resolving tags does not prove an owner accepted responsibility.
+
+The output includes complete queue items, coverage counts, an inventory batch digest,
+and digests of the findings and ownership directory. `--export` checks the retained
+inventory against original input bytes; without it, `original_export_checked` is
+false. Hashes establish consistency, not authentication. No decisions are written to
+SQLite, no tickets are sent, and no remediation is performed. Existing evidence
+remains unchanged. This is a planning handoff, not a persisted decision workflow.
+
+The command accepts regular local POSIX inputs. Findings and ownership-directory
+inputs are bounded to 4 MiB; findings have at most 10,000 non-empty lines and 64 KiB
+per line. Duplicate JSON fields, non-finite values, and unknown record fields fail
+before publishing a result. Use fresh private output paths outside Git. `--output`
+creates a complete 0600 file and never overwrites; omitting it prints sensitive queue
+content to stdout. Failure returns exit 2 with a fixed error and no success document.
+
 ## Status and next work
 
 The local fixture pipeline and saved osquery JSON import work. AWS and network
