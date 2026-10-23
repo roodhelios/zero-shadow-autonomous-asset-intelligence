@@ -28,14 +28,17 @@ def _json(data):
     return value
 
 
-def plan_inventory(database, finding_data, directory_data, *, as_of, export_data=None):
+def plan_inventory(database, finding_data, directory_data, *, as_of, export_data=None,
+                   baseline_as_of=None):
     """Reconcile inventory, then validate every finding reference before returning queues."""
+    if baseline_as_of is not None and baseline_as_of > as_of:
+        raise ValueError("baseline review date cannot follow current review date")
     if len(finding_data) > MAX_BYTES:
         raise ValueError("finding input exceeds 4 MiB")
     directory = OwnershipDirectory.from_dict(_json(directory_data))
     inventory = export_inventory(database, export_data=export_data)
     asset_ids = {item["asset"]["asset_id"] for item in inventory["assets"]}
-    items, assessed = [], set()
+    items, assessed, records = [], set(), []
     for line in finding_data.decode("utf-8").splitlines():
         if len(line.encode("utf-8")) > MAX_LINE_BYTES:
             raise ValueError("finding line exceeds 64 KiB")
@@ -56,11 +59,12 @@ def plan_inventory(database, finding_data, directory_data, *, as_of, export_data
         if item.plan.asset_id != finding["asset_id"]:
             raise ValueError("finding asset identity changed during validation")
         items.append(item)
+        records.append(record)
         assessed.add(finding["asset_id"])
     queues = build_work_queue_document(items, directory=directory, as_of=as_of)
     canonical = json.dumps(inventory, sort_keys=True, ensure_ascii=True,
                            allow_nan=False, separators=(",", ":")).encode("ascii")
-    return {
+    result = {
         "schema_version": 1,
         "report_type": "inventory-remediation-queues",
         "inventory_binding": {
@@ -84,6 +88,32 @@ def plan_inventory(database, finding_data, directory_data, *, as_of, export_data
         ),
     }
 
+    if baseline_as_of is not None:
+        changes = []
+        for record, current in zip(records, items):
+            baseline = queue_item(record, directory=directory, as_of=baseline_as_of)
+            old, new = baseline.plan, current.plan
+            if old.risk_assessment.to_dict() != new.risk_assessment.to_dict():
+                raise ValueError("date comparison must preserve the technical risk assessment")
+            if old.priority != new.priority or old.overdue != new.overdue:
+                changes.append({
+                    "finding_id": new.finding_id, "asset_id": new.asset_id,
+                    "previous_priority": old.priority, "current_priority": new.priority,
+                    "previous_overdue": old.overdue, "current_overdue": new.overdue,
+                    "due_date": new.due_date.isoformat(),
+                })
+        result["priority_comparison"] = {
+            "baseline_as_of": baseline_as_of.isoformat(), "current_as_of": as_of.isoformat(),
+            "changed_item_count": len(changes), "unchanged_item_count": len(items)-len(changes),
+            "changes": sorted(changes, key=lambda item: item["finding_id"]),
+            "interpretation": (
+                "Same reconciled inventory, findings, reviewed tags and ownership policy at both dates. "
+                "Only date-driven overdue status and priority are compared. This is not evidence "
+                "of changed exposure, a new finding, remediation, or accepted ownership."
+            ),
+        }
+    return result
+
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
@@ -91,6 +121,7 @@ def main(argv=None):
     parser.add_argument("findings", type=Path)
     parser.add_argument("--directory", type=Path, required=True)
     parser.add_argument("--as-of", required=True)
+    parser.add_argument("--baseline-as-of", help="compare date-driven priority against this earlier review date")
     parser.add_argument("--export", type=Path, help="check inventory against original osquery export")
     parser.add_argument("--output", type=Path, help="new private JSON file; otherwise stdout")
     args = parser.parse_args(argv)
@@ -99,7 +130,8 @@ def main(argv=None):
             raise ValueError("private inventory files require POSIX")
         result = plan_inventory(args.database, _read(args.findings), _read(args.directory),
             as_of=date.fromisoformat(args.as_of),
-            export_data=_read(args.export) if args.export else None)
+            export_data=_read(args.export) if args.export else None,
+            baseline_as_of=date.fromisoformat(args.baseline_as_of) if args.baseline_as_of else None)
         rendered = json.dumps(result, sort_keys=True, indent=2, allow_nan=False) + "\n"
         if args.output:
             _publish(args.output, rendered)
