@@ -14,16 +14,22 @@ from engine.discovery.osquery_collector import _read, _unique_fields
 MAX_REVIEW_BYTES = 16 * 1024
 
 
-def verify_review(database: Path, record_data: bytes, *, export_data: bytes | None = None) -> dict:
+def verify_review(database: Path, record_data: bytes, *, export_data: bytes | None = None,
+                  require_batch_binding: bool = False) -> dict:
     """Recompute the complete checkpoint, including its digest and coverage values."""
     if len(record_data) > MAX_REVIEW_BYTES:
         raise ValueError("review record exceeds 16 KiB")
     record = json.loads(record_data.decode("utf-8"), object_pairs_hook=_unique_fields)
     if not isinstance(record, dict):
         raise ValueError("review record must be an object")
+    version = record.get("schema_version")
+    if type(version) is not int or version not in (1, 2):
+        raise ValueError("unsupported review schema version")
+    if require_batch_binding and version != 2:
+        raise ValueError("a batch-bound version 2 review is required")
     inventory = export_inventory(database, export_data=export_data)
     expected = review_record(inventory, reviewed_at=record.get("reviewed_at"),
-                             reviewer_note=record.get("reviewer_note"))
+                             reviewer_note=record.get("reviewer_note"), bind_batch=version == 2)
 
     def canonical(value):
         return json.dumps(value, sort_keys=True, ensure_ascii=True,
@@ -31,7 +37,7 @@ def verify_review(database: Path, record_data: bytes, *, export_data: bytes | No
 
     if canonical(record) != canonical(expected):
         raise ValueError("review record does not match current coverage")
-    return {
+    result = {
         "schema_version": 1,
         "report_type": "inventory-review-verification",
         "status": "consistent",
@@ -43,6 +49,14 @@ def verify_review(database: Path, record_data: bytes, *, export_data: bytes | No
             "authenticate the reviewer, identify the batch, or verify source claims."
         ),
     }
+    if version == 2:
+        result["batch_bound"] = True
+        result["batch_sha256"] = expected["batch_sha256"]
+        result["interpretation"] = (
+            "The saved review matches the complete current inventory export and coverage. "
+            "This does not authenticate the reviewer or verify source claims."
+        )
+    return result
 
 
 def main(argv=None) -> int:
@@ -50,10 +64,13 @@ def main(argv=None) -> int:
     parser.add_argument("database", type=Path)
     parser.add_argument("review", type=Path, help="saved inventory review JSON")
     parser.add_argument("--export", type=Path, help="original osquery export, when used for the review")
+    parser.add_argument("--require-batch-binding", action="store_true",
+                        help="reject coverage-only version 1 reviews")
     args = parser.parse_args(argv)
     try:
         result = verify_review(args.database, _read(args.review),
-                               export_data=_read(args.export) if args.export else None)
+                               export_data=_read(args.export) if args.export else None,
+                               require_batch_binding=args.require_batch_binding)
     except (OSError, ValueError, TypeError, OverflowError, sqlite3.DatabaseError,
             UnicodeError, RecursionError):
         print("error: review record did not verify against current inventory coverage", file=sys.stderr)
