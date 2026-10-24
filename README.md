@@ -7,6 +7,27 @@ Zero Shadow correlates explicitly scoped fixture observations, explains risk sco
 resolves ownership from tags, and preserves linked evidence in SQLite. It does not
 scan networks, enumerate cloud accounts, or send remediation actions.
 
+## Try the complete retained-inventory exercise
+
+On POSIX with Python 3.11 or newer, use only the standard library:
+
+```bash
+python -m engine.demo_inventory
+```
+
+Expect `inventory_exercise_passed`, two assets, one finding,
+`assessment_reproduced`, `bound_current_model`, and `changed_export: rejected`.
+The command imports the bundled synthetic osquery export, retains a finding with
+ownership/planning decisions, deletes the original discovery database, and verifies
+the assessment against the original export with strict model binding. It also checks
+that changed source bytes are rejected and neither input database was modified.
+All temporary files are discarded. Only aggregate results reach stdout.
+
+The observation and assessment dates are fixed October 23 fixtures. This exercise
+uses native SQLite, not a database substitute. It does not collect live telemetry,
+authenticate source or owner claims, perform remediation, or implement historical
+model replay. Preserve the original export and source checkout for real retained data.
+
 ## Follow the evidence
 
 | Stage | Working behavior | Implementation |
