@@ -11,6 +11,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 from database.evidence_reader import EvidenceReader
+from database.assessment_model import store_model
 from database.inventory_export_cli import export_inventory
 from database.inventory_receipt import store_receipt
 from database.repository import EvidenceBundle, EvidenceRepository, _timestamp
@@ -93,6 +94,7 @@ def retain_assessment(database, finding_data, directory_data, output, *, as_of,
                 EvidenceReader(connection).read_asset(asset_id)
             if connection.execute("PRAGMA foreign_key_check").fetchall():
                 raise ValueError("retained decisions have invalid references")
+            model_binding = store_model(connection)
         finally:
             connection.close()
         with temporary.open("rb") as handle:
@@ -100,7 +102,8 @@ def retain_assessment(database, finding_data, directory_data, output, *, as_of,
         os.link(temporary, output)
     finally:
         temporary.unlink(missing_ok=True)
-    return {"schema_version": 1, "status": "assessment_stored", "finding_count": len(bundles),
+    return {"schema_version": 1, "status": "assessment_stored", "model_binding": model_binding,
+            "finding_count": len(bundles),
             "assessed_asset_count": len({bundle.asset.asset_id for bundle in bundles}),
             "inventory_asset_count": len(assets), "input_sha256": report["input_sha256"],
             "interpretation": "A new database retains supplied assessment inputs and linked decisions. "

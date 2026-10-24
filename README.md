@@ -453,6 +453,35 @@ inputs and decisions can create another internally consistent database. No signi
 versioned reassessment is added. Temporary reconstruction uses the committed schema,
 not triggers copied from the supplied database.
 
+## Retained assessment model binding
+
+New first-assessment databases retain model ID `zero-shadow-first-assessment`, version
+`1`, and SHA-256 digests of the nine scoring, ownership, planning, input, discovery and
+correlation source modules. The manifest has its own canonical digest and append-only
+SQLite record. These digests bind an exact source-checkout implementation, including
+formatting. They do not sign the code, authenticate its author or isolate runtime changes.
+
+Require that binding when reproducing a newly retained assessment:
+
+```bash
+python -m database.inventory_assessment_verify /tmp/zero-shadow-assessed.sqlite \
+  --export examples/osquery-system-info-expanded.json --require-model-binding
+```
+
+Success adds `model_binding.status: bound_current_model`. A changed source digest,
+unknown model/version, corrupt binding or malformed manifest fails before replay;
+there is no fallback from a bad binding to legacy mode. Legacy databases without the
+new table still replay under the current model by default, with explicit
+`legacy_unversioned` status. Strict mode rejects them, including a removed binding.
+No migration rewrites an old database. A party controlling the whole database and
+runtime can replace both, so this is consistency evidence, not authenticity.
+
+Only the current version-1 implementation is supported. Source changes can prevent
+reproduction even if they preserve behavior. This deliberately conservative binding
+is a foundation for future version-specific replay, not an implementation of historic
+model dispatch or reassessment history. Preserve the relevant source checkout with
+retained evidence before changing model code.
+
 ## Status and next work
 
 The local fixture pipeline and saved osquery JSON import work. AWS and network

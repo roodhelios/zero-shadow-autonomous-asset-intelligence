@@ -14,6 +14,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 from database.inventory_assessment_cli import retain_assessment
+from database.assessment_model import read_model
 from database.inventory_cli import store_export
 from database.inventory_export_cli import export_inventory
 from database.repository import _timestamp
@@ -39,7 +40,7 @@ def _snapshot(source, destination):
     destination.chmod(0o600)
 
 
-def verify_assessment(database, export_data):
+def verify_assessment(database, export_data, *, require_model_binding=False):
     """Use one private closed-file snapshot, then compare every reconstructed decision."""
     with tempfile.TemporaryDirectory(prefix="assessment-check-") as directory:
         root = Path(directory)
@@ -53,6 +54,7 @@ def verify_assessment(database, export_data):
             if any(kind == "view" or not isinstance(sql, str) or
                    not re.match(r"\s*CREATE\s+TABLE\b", sql, re.IGNORECASE) for kind, sql in objects):
                 raise ValueError("only ordinary stored evidence tables are supported")
+            model_binding = read_model(connection, required=require_model_binding)
             rows = connection.execute("SELECT singleton, findings_jsonl, ownership_directory_json, "
                 "as_of, assessed_at, inventory_binding_json, input_sha256_json "
                 "FROM inventory_assessment_input").fetchall()
@@ -106,6 +108,7 @@ def verify_assessment(database, export_data):
         if any(count != result["finding_count"] for count in stored_counts.values()):
             raise ValueError("unexpected decision record count")
     return {"schema_version": 1, "status": "assessment_reproduced",
+            "model_binding": model_binding,
             "asset_count": result["inventory_asset_count"], "finding_count": result["finding_count"],
             "original_export_checked": True, "input_sha256": expected_digests,
             "interpretation": "Stored findings, ownership decisions and plans reproduce from retained "
@@ -118,9 +121,12 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("database", type=Path)
     parser.add_argument("--export", required=True, type=Path)
+    parser.add_argument("--require-model-binding", action="store_true",
+                        help="reject legacy assessments without an explicit retained model")
     args = parser.parse_args(argv)
     try:
-        result = verify_assessment(args.database, _read(args.export))
+        result = verify_assessment(args.database, _read(args.export),
+                                   require_model_binding=args.require_model_binding)
     except (OSError, ValueError, TypeError, KeyError, sqlite3.DatabaseError,
             UnicodeError, RecursionError, OverflowError):
         print("error: retained assessment did not reproduce; check closed database and original export",
