@@ -422,6 +422,37 @@ fail without publishing output. Later assessment versions, reviewer authenticati
 retention policies and PostgreSQL support remain unfinished. A database administrator
 can replace files or alter schema; append-only triggers do not prevent that.
 
+## Reproduce retained assessment decisions
+
+After retaining the first assessment above, check its stored findings, ownership and
+plans against the exact retained inputs and original osquery export:
+
+```bash
+python -m database.inventory_assessment_verify /tmp/zero-shadow-assessed.sqlite \
+  --export examples/osquery-system-info-expanded.json
+```
+
+Expect `assessment_reproduced`, two assets, one finding and `original_export_checked: true`.
+The verifier copies a closed, checkpointed regular database of at most 16 MiB into a
+private temporary directory, reconciles the original export, regenerates discovery
+using the committed schema and re-runs the current assessment model. It compares the
+complete reconstructed asset snapshots, decision rows, input digests and original
+inventory binding. The supplied database is read-only and unchanged. Symlinks and
+pending WAL/journal sidecars, views and virtual tables are rejected; do not run against a live writer.
+
+The original export is required even when initial retention omitted its optional source
+check. The stored flag remains a historical caller claim; verification reports the source
+check performed now. Edited inputs with a recalculated digest must still reproduce the
+stored decisions. A plan changed independently of the inputs fails. Failure exits 2
+with a fixed error and no success document. Summary output contains counts and input
+digests, not individual asset IDs, findings or ownership details.
+
+This proves reproducibility under the current model, not reviewer identity, source truth,
+accepted ownership, historical validation time or remediation. A party able to replace all
+inputs and decisions can create another internally consistent database. No signing or
+versioned reassessment is added. Temporary reconstruction uses the committed schema,
+not triggers copied from the supplied database.
+
 ## Status and next work
 
 The local fixture pipeline and saved osquery JSON import work. AWS and network
