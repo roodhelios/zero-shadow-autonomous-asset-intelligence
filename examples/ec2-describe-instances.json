@@ -1,0 +1,18 @@
+{
+  "Reservations": [{
+    "OwnerId": "111122223333",
+    "Instances": [{
+      "InstanceId": "i-0123456789abcdef0",
+      "PrivateDnsName": "checkout.example.test",
+      "PrivateIpAddress": "192.0.2.40",
+      "PublicIpAddress": "198.51.100.40",
+      "State": {"Name": "stopped"},
+      "Tags": [
+        {"Key": "environment", "Value": "production"},
+        {"Key": "owner_group", "Value": "cloud-platform"},
+        {"Key": "service", "Value": "web"},
+        {"Key": "unselected-note", "Value": "synthetic omitted metadata"}
+      ]
+    }]
+  }]
+}

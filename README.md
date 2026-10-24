@@ -503,10 +503,21 @@ is a foundation for future version-specific replay, not an implementation of his
 model dispatch or reassessment history. Preserve the relevant source checkout with
 retained evidence before changing model code.
 
+## Import an already saved EC2 export
+
+```bash
+python -m engine.discovery.aws_discovery examples/ec2-describe-instances.json \
+  --scope synthetic --account 111122223333 --region us-east-1 --format inventory
+```
+
+Expect one supplied asset with account/region-scoped ARN identity and source-row
+references. This local importer makes no AWS requests. It can also generate fixtures
+for the existing SQLite evidence workflow. See the [input contract and limits](docs/ec2-import.md).
+
 ## Status and next work
 
-The local fixture pipeline and saved osquery JSON import work. AWS and network
-connector files and some infrastructure files remain placeholders. Live osquery
+The local fixture pipeline, saved osquery JSON import and bounded saved EC2 import work.
+Live AWS/network connectors and some infrastructure files remain unimplemented. Live osquery
 collection is not implemented; the importer reads only a supplied local file.
 The workflow CLI is available; next work should validate deployment and persistence
 boundaries before connecting an authorized external discovery source.
