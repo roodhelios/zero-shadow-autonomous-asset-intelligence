@@ -42,3 +42,38 @@ resources. Scope, source claims and account/region labels are not authenticated.
 Live discovery, retained multi-source import receipts and region attestation remain
 unfinished. Keep real exports private and outside Git. Assistant support was used
 to implement and review this extension.
+
+## Retain and reproduce a discovery batch
+
+The dedicated EC2 evidence command retains projected observations and import context
+in a new SQLite database. From the repository root, choose an unused private path:
+
+```bash
+python -m database.ec2_inventory store examples/ec2-describe-instances.json \
+  --scope synthetic --account 111122223333 --region us-east-1 \
+  --observed-at 2026-10-24T00:00:00Z --output /tmp/new-ec2-inventory.sqlite
+python -m database.ec2_inventory verify /tmp/new-ec2-inventory.sqlite \
+  --export examples/ec2-describe-instances.json
+```
+
+Expect `ec2_inventory_stored`, then `ec2_inventory_reproduced`, with one asset and one
+observation. Both commands return aggregate results and byte/context digests, without
+addresses, raw observations, account labels or asset IDs. The store command verifies
+the complete closed database before exclusive mode-0600 publication. Existing paths
+are never overwritten. Keep the original export separately, private and unchanged.
+
+Verification copies one bounded closed-file snapshot, reads ordinary tables only and
+rebuilds expected discovery in temporary SQLite from the supplied original export.
+It checks context, exact source bytes, source-row references and every linked retained
+record. Changed bytes fail even if JSON meaning is unchanged. Extra decisions do not
+silently become verified discovery. The original database is not written. WAL/journal
+sidecars, symlinks, views, databases over 16 MiB and contexts over 4 MiB are refused.
+Temporary verification files are removed. Empty EC2 batches cannot be retained.
+
+This EC2-specific context format is separate from the osquery import receipt and
+assessment commands. Use the dedicated EC2 verifier; generic osquery assessment replay
+does not dispatch EC2 inputs. No source code version is frozen. Reproduction establishes
+local consistency under the current importer, not source authentication, complete
+coverage, historical observation time, accepted ownership or remediation. Replacing
+all source/context/evidence can create another internally consistent set. Retained
+multi-source assessment and model-version dispatch remain future work.
