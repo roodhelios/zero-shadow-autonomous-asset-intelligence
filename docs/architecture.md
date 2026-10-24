@@ -176,3 +176,13 @@ writer shares the same decision SQL; its existing transaction tests remain requi
 The new file also retains exact reviewed inputs, dates and inventory binding before
 exclusive publication. This is a first-assessment workflow, not versioned reassessment,
 reviewer attestation, deployed discovery or automatic remediation.
+
+
+`inventory_assessment_verify` reproduces the complete first assessment against retained
+inputs and an externally supplied original export. A bounded private closed-file snapshot
+keeps the separate read helpers on the same input bytes. Original input digests and
+inventory binding are checked, all decision counts and linked records must match the
+replayed current model, and foreign-key violations fail. Changed risk/priority, ownership,
+extra decisions or incompatible model output prevent a success summary. The supplied file
+is unchanged. This is local reproducibility, not authenticity or a migration between
+model versions. A versioned model contract remains a prerequisite for durable reassessment.
