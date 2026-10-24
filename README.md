@@ -513,6 +513,9 @@ python -m engine.discovery.aws_discovery examples/ec2-describe-instances.json \
 Expect one supplied asset with account/region-scoped ARN identity and source-row
 references. This local importer makes no AWS requests. It can also generate fixtures
 for the existing SQLite evidence workflow. See the [input contract and limits](docs/ec2-import.md).
+The [dedicated EC2 evidence commands](docs/ec2-import.md#retain-and-reproduce-a-discovery-batch)
+also retain a discovery batch in private SQLite and reproduce its complete contents
+against the separately supplied original export before reporting success.
 
 ## Status and next work
 
