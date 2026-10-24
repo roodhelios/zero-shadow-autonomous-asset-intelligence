@@ -186,3 +186,15 @@ replayed current model, and foreign-key violations fail. Changed risk/priority, 
 extra decisions or incompatible model output prevent a success summary. The supplied file
 is unchanged. This is local reproducibility, not authenticity or a migration between
 model versions. A versioned model contract remains a prerequisite for durable reassessment.
+
+
+## First-assessment model contract
+
+`database.assessment_model` records an ID, integer version and exact implementation
+source digests for nine fixed modules. New retention adds one append-only model row.
+Verification compares canonical bytes and digest with the current contract before
+replaying decisions. Unknown or changed bindings fail; an absent legacy binding has
+an explicit unversioned status unless `--require-model-binding` requires one. This
+protects against silently claiming the current implementation is a retained historical
+model, but does not freeze a runtime, authenticate code or implement versioned replay.
+The manifest lists its source paths, and source-checkout files must be available.
