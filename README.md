@@ -30,6 +30,11 @@ model replay. Preserve the original export and source checkout for real retained
 
 ## Follow the evidence
 
+For saved cloud inventory, the [EC2 review export](docs/ec2-import.md#export-verified-snapshots-for-review)
+reproduces the original saved export before publishing complete retained snapshots
+to a new private JSON file. It includes stable asset IDs and source-row references,
+with empty decision arrays for unassessed assets. No AWS connection is needed.
+
 | Stage | Working behavior | Implementation |
 | --- | --- | --- |
 | Discover | Validate local observations with synthetic, owned, or authorized scope | [Fixture discovery](engine/discovery/fixture_discovery.py) |

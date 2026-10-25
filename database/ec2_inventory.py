@@ -17,7 +17,7 @@ from database.inventory_assessment_verify import MAX_DATABASE_BYTES, _snapshot
 from database.repository import EvidenceRepository, _timestamp
 from engine.correlation import correlate_assets
 from engine.discovery.aws_discovery import convert_export
-from engine.discovery.osquery_collector import MAX_INPUT_BYTES, _read, _unique_fields
+from engine.discovery.osquery_collector import MAX_INPUT_BYTES, _publish, _read, _unique_fields
 from engine.models import AssetObservation
 
 
@@ -53,7 +53,7 @@ def _snapshots(connection):
     return [reader.read_inventory(identifier).to_dict() for identifier in ids]
 
 
-def verify_ec2(database, export_data):
+def _reproduce_ec2(database, export_data):
     with tempfile.TemporaryDirectory(prefix="ec2-verify-") as directory:
         root = Path(directory); retained = root/"retained.sqlite"
         _snapshot(database, retained)
@@ -88,12 +88,27 @@ def verify_ec2(database, export_data):
             reproduced = _snapshots(connection)
         if actual != reproduced:
             raise ValueError("retained discovery did not reproduce")
-    return {"schema_version": 1, "status": "ec2_inventory_reproduced", "asset_count": len(assets),
+    result = {"schema_version": 1, "status": "ec2_inventory_reproduced", "asset_count": len(assets),
             "observation_count": len(expected["source_records"]), "input_sha256": expected["input_sha256"],
             "context_sha256": digest, "original_export_checked": True,
             "interpretation": "Discovery-only records reproduce from a separately supplied saved export. "
             "Context, row references and projected observations are checked, not collector authenticity, "
             "complete coverage, historical observation time, accepted ownership or remediation."}
+    return result, expected, actual
+
+
+def verify_ec2(database, export_data):
+    return _reproduce_ec2(database, export_data)[0]
+
+
+def export_ec2(database, export_data, output):
+    """Publish snapshots from the same closed-file copy that passed reproduction."""
+    result, context, snapshots = _reproduce_ec2(database, export_data)
+    document = {"schema_version": 1, "report_type": "retained-ec2-inventory",
+                "source_reconciliation": result, "import_context": context, "assets": snapshots}
+    _publish(output, json.dumps(document, sort_keys=True, indent=2, allow_nan=False) + "\n")
+    # Only the private file contains identities, addresses, tags and source-row references.
+    return dict(result, status="ec2_inventory_exported")
 
 
 def store_ec2(source, output, *, scope, account, region, observed_at):
@@ -140,11 +155,19 @@ def main(argv=None):
     store.add_argument("--observed-at", required=True)
     verify = commands.add_parser("verify"); verify.add_argument("database", type=Path)
     verify.add_argument("--export", required=True, type=Path)
+    export = commands.add_parser("export", help="reproduce and privately export complete discovery snapshots")
+    export.add_argument("database", type=Path)
+    export.add_argument("--export", required=True, type=Path)
+    export.add_argument("--output", required=True, type=Path, help="new private JSON file; never stdout")
     args = parser.parse_args(argv)
     try:
-        result = (verify_ec2(args.database, _read(args.export)) if args.command == "verify" else
-            store_ec2(args.export, args.output, scope=args.scope, account=args.account, region=args.region,
-                observed_at=datetime.fromisoformat(args.observed_at.replace("Z", "+00:00"))))
+        if args.command == "export":
+            result = export_ec2(args.database, _read(args.export), args.output)
+        elif args.command == "verify":
+            result = verify_ec2(args.database, _read(args.export))
+        else:
+            result = store_ec2(args.export, args.output, scope=args.scope, account=args.account, region=args.region,
+                observed_at=datetime.fromisoformat(args.observed_at.replace("Z", "+00:00")))
     except (OSError, ValueError, TypeError, KeyError, sqlite3.DatabaseError, UnicodeError, RecursionError, OverflowError):
         print("error: EC2 evidence workflow failed; check closed database, original export and new output path",
               file=sys.stderr)
