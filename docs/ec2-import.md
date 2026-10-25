@@ -111,7 +111,50 @@ account labels, addresses, tags and asset identities. Keep it outside Git and
 review it before sharing. There is no stdout mode for the full evidence.
 
 This is the EC2-specific discovery report, not an osquery receipt or an assessment
-input. Generic assessment and queue commands still do not accept this format.
+input. Existing osquery assessment and queue commands do not accept this format.
 Digests establish local consistency under the current importer, not source
 authenticity or complete cloud coverage. Version-specific replay and multi-source
 assessment dispatch remain unfinished.
+
+## Plan explicit findings with source selection
+
+Discovery alone does not establish a vulnerability or its severity. Supply a separately
+reviewed finding that names an exact retained asset ID. After the store command above:
+
+```bash
+python -m engine.discovery_queue_cli /tmp/new-ec2-inventory.sqlite examples/ec2-findings.jsonl \
+  --source ec2 --export examples/ec2-describe-instances.json \
+  --directory examples/ownership-directory.json --as-of 2026-10-25 \
+  --output /tmp/new-ec2-queues.json
+```
+
+Expect `queues_created`, `source_kind: ec2`, `asset_count: 1` and
+`assets_with_supplied_findings: 1` on stdout. The private output has
+`report_type: source-inventory-remediation-queues`, one queue for `cloud-platform`,
+and the existing model's risk/priority explanation. This finding is deliberately
+synthetic and independently supplied. Its `exposure: internal` is a reviewed input,
+not an inference from the export's address fields. Its reviewed `asset_tags` drive
+routing; empty reviewed tags leave it unassigned even when the EC2 export has tags.
+
+The same command accepts `--source osquery` for databases created by `inventory_cli`,
+using their original osquery export and matching finding IDs. This delegates to the
+existing osquery planner and preserves its inventory binding and queue decisions.
+Source selection is mandatory and does not guess the type from database contents.
+The wrong source, changed export, unknown asset, duplicate finding, or invalid trailing
+record fails before publication. Each call reviews one source batch; it does not join
+EC2 and osquery identities or merge separate inventories.
+
+All original-export bytes are required. For EC2, the planner uses the same closed-file
+snapshot that passes full discovery reproduction. The report binds that complete
+discovery document and exact finding/directory bytes with digests. Multiple findings
+on one asset count as one assessed asset. Assets without supplied findings stay
+unassessed. The existing limits apply: 4 MiB inputs, 64 KiB finding lines and 10,000
+finding records. Output is a new private 0600 file; existing paths are not overwritten.
+Stdout is aggregate-only. Keep real queues private because they contain identities
+and reviewed finding details.
+
+No decisions are appended to SQLite, no teams are contacted and no remediation is
+performed. Risk and routing are lab model results, not verified exploitability or
+accepted ownership. Existing model-bound assessment code and version-1 source hashes
+are unchanged. Retained EC2 assessments, historical model replay, and cross-source
+identity reconciliation remain unfinished.

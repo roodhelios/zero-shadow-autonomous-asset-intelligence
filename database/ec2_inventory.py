@@ -101,14 +101,19 @@ def verify_ec2(database, export_data):
     return _reproduce_ec2(database, export_data)[0]
 
 
+def read_ec2(database, export_data):
+    """Return only snapshots from the closed-file copy that passed reproduction."""
+    result, context, snapshots = _reproduce_ec2(database, export_data)
+    return {"schema_version": 1, "report_type": "retained-ec2-inventory",
+            "source_reconciliation": result, "import_context": context, "assets": snapshots}
+
+
 def export_ec2(database, export_data, output):
     """Publish snapshots from the same closed-file copy that passed reproduction."""
-    result, context, snapshots = _reproduce_ec2(database, export_data)
-    document = {"schema_version": 1, "report_type": "retained-ec2-inventory",
-                "source_reconciliation": result, "import_context": context, "assets": snapshots}
+    document = read_ec2(database, export_data)
     _publish(output, json.dumps(document, sort_keys=True, indent=2, allow_nan=False) + "\n")
     # Only the private file contains identities, addresses, tags and source-row references.
-    return dict(result, status="ec2_inventory_exported")
+    return dict(document["source_reconciliation"], status="ec2_inventory_exported")
 
 
 def store_ec2(source, output, *, scope, account, region, observed_at):
