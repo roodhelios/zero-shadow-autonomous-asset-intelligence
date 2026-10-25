@@ -35,6 +35,11 @@ reproduces the original saved export before publishing complete retained snapsho
 to a new private JSON file. It includes stable asset IDs and source-row references,
 with empty decision arrays for unassessed assets. No AWS connection is needed.
 
+To plan reviewed findings against retained EC2 or osquery evidence, use the
+[source-selected queue workflow](docs/ec2-import.md#plan-explicit-findings-with-source-selection).
+It requires the original export and an explicit source. Imported addresses and tags
+never invent findings or accepted ownership.
+
 | Stage | Working behavior | Implementation |
 | --- | --- | --- |
 | Discover | Validate local observations with synthetic, owned, or authorized scope | [Fixture discovery](engine/discovery/fixture_discovery.py) |

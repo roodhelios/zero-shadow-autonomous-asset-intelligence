@@ -1,0 +1,1 @@
+{"asset_tags":{"owner_group":"cloud-platform"},"finding":{"asset_id":"asset-da2fa8d38b931447","control_state":"missing","description":"Synthetic independently reviewed configuration finding","exploit_evidence":"none","exposure":"internal","finding_id":"synthetic-ec2-review","identity_confidence":"high","severity":"medium","source":"synthetic-review"},"opened_on":"2026-10-25"}
