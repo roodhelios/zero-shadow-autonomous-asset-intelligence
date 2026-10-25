@@ -77,3 +77,41 @@ local consistency under the current importer, not source authentication, complet
 coverage, historical observation time, accepted ownership or remediation. Replacing
 all source/context/evidence can create another internally consistent set. Retained
 multi-source assessment and model-version dispatch remain future work.
+
+## Export verified snapshots for review
+
+After the store command above, export complete evidence for an analyst without
+querying SQLite tables or manually copying asset IDs:
+
+```bash
+python -m database.ec2_inventory export /tmp/new-ec2-inventory.sqlite \
+  --export examples/ec2-describe-instances.json --output /tmp/new-ec2-review.json
+```
+
+Expect `ec2_inventory_exported` on stdout with `asset_count: 1`,
+`observation_count: 1` and `original_export_checked: true`. The new mode-0600 JSON
+file has `report_type: retained-ec2-inventory` and three review sections:
+
+| Field | Contents |
+| --- | --- |
+| `source_reconciliation` | Reproduction result and original-byte/context digests |
+| `import_context` | Supplied scope, account, region, observation time, projection digest and source-row references |
+| `assets` | Complete retained snapshots with stable asset IDs, observations and snapshot digests |
+
+The fixture produces one snapshot with one observation and empty `findings`,
+`ownership_decisions` and `remediation_plans` arrays. Those empty arrays mean
+unassessed. They are not a clean bill of health or a reason to assign a risk score.
+
+Export uses the same private database snapshot that passed full reproduction. It
+does not reopen the original database to collect evidence after verification.
+Changed source bytes or retained observations fail before publication. Existing
+output files are never replaced. The original database and source export are not
+modified. Stdout stays aggregate-only; the required private output contains
+account labels, addresses, tags and asset identities. Keep it outside Git and
+review it before sharing. There is no stdout mode for the full evidence.
+
+This is the EC2-specific discovery report, not an osquery receipt or an assessment
+input. Generic assessment and queue commands still do not accept this format.
+Digests establish local consistency under the current importer, not source
+authenticity or complete cloud coverage. Version-specific replay and multi-source
+assessment dispatch remain unfinished.
