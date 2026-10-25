@@ -156,5 +156,70 @@ and reviewed finding details.
 No decisions are appended to SQLite, no teams are contacted and no remediation is
 performed. Risk and routing are lab model results, not verified exploitability or
 accepted ownership. Existing model-bound assessment code and version-1 source hashes
-are unchanged. Retained EC2 assessments, historical model replay, and cross-source
-identity reconciliation remain unfinished.
+are unchanged. The receipt workflow below can retain a first EC2 assessment separately.
+Historical model replay and cross-source identity reconciliation remain unfinished.
+
+## Retain and reproduce an EC2 assessment
+
+Keep a first reviewed assessment after the original discovery database is no longer
+available. From the repository root, after the EC2 store command above:
+
+```bash
+python -m database.ec2_assessment retain /tmp/new-ec2-inventory.sqlite examples/ec2-findings.jsonl \
+  --directory examples/ownership-directory.json --as-of 2026-10-25 \
+  --assessed-at 2026-10-25T01:00:00Z --export examples/ec2-describe-instances.json \
+  --output /tmp/new-ec2-assessment.sqlite
+python -m database.ec2_assessment verify /tmp/new-ec2-assessment.sqlite \
+  --export examples/ec2-describe-instances.json
+python -m database.ec2_assessment review /tmp/new-ec2-assessment.sqlite \
+  --export examples/ec2-describe-instances.json --output /tmp/new-ec2-assessment-review.json
+```
+
+Expect `ec2_assessment_stored`, `ec2_assessment_reproduced`, then
+`ec2_assessment_exported`. Each reports one asset, one assessed asset, one finding
+and `original_export_checked: true`. The review JSON has
+`report_type: retained-ec2-assessment-review`; inspect its `queue_report` for the
+fixture cloud-platform queue and risk/priority explanation. Stdout contains only
+aggregate results and payload/model digests. Both output paths must be unused.
+
+The receipt is a **separate SQLite database**, not an append to discovery or the
+osquery assessment tables. Its one append-only `ec2_assessment_record` stores a
+canonical JSON review with verified discovery snapshots/context, exact finding and
+ownership-directory strings, review/assessment dates, complete queue decisions and
+selected implementation-file SHA-256 bindings. It does not insert normalized finding,
+ownership or plan rows into the relational evidence repository. This format represents
+one first assessment; reassessment history and batch joins are not implemented.
+
+Retention copies one bounded closed discovery snapshot before reading or planning,
+so a later change to the source database cannot retarget the receipt. It validates
+the full receipt through replay before exclusive mode-0600 publication. The original
+discovery database and supplied inputs are not changed. At least one explicit finding
+is required. Observation time must not follow assessment time, and the review date
+must fall between their UTC calendar dates. Dates and source context remain claims.
+
+Verification and review require only the receipt and original saved EC2 export. They
+do not need the original discovery database or separately retained finding/directory
+files. They take one private receipt snapshot, rebuild native discovery from the
+original export and retained context, then recompute every queue decision and compare
+the entire canonical record. The review export uses the same verified receipt snapshot.
+Mismatched source bytes or inconsistent snapshots, inputs, decisions, dates or model
+binding fail. A consistently changed claimed assessment time can still reproduce;
+this format does not authenticate when the review happened.
+Recomputing the payload checksum alone cannot hide inconsistent decisions.
+
+The receipt payload is limited to 12 MiB and the database to 16 MiB; discovery/review
+inputs retain their existing bounds. Views, virtual/extra tables, live WAL/journal
+sidecars and symlinked database inputs are refused. Existing output files are never
+overwritten, and failed verification publishes no review output. Keep receipts and
+review files private and outside Git: they contain asset identities and reviewed facts.
+The review export omits the raw retained finding/directory strings, but its derived
+queue can still contain sensitive details.
+
+Only the exact current binding is supported. The selected source-file hashes do not
+freeze Python/SQLite, dependencies, all transitive code or a historical environment.
+Even a compatible edit to a bound file blocks replay; preserve the source checkout.
+This is a replay guard, not trusted code attestation, source authentication, reviewer
+approval, accepted ownership or remediation. A party able to replace the receipt and
+all supplied evidence can construct another consistent review. Native SQLite storage
+and append-only triggers do not make those claims authentic. Historical model dispatch,
+normalized EC2 assessment persistence and multi-source identity remain future work.

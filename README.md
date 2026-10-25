@@ -40,6 +40,12 @@ To plan reviewed findings against retained EC2 or osquery evidence, use the
 It requires the original export and an explicit source. Imported addresses and tags
 never invent findings or accepted ownership.
 
+For a review that must outlive the discovery database, the [EC2 assessment receipt](docs/ec2-import.md#retain-and-reproduce-an-ec2-assessment)
+retains the verified discovery snapshots, exact reviewed inputs, queue decisions and
+a current model-source binding in a separate private SQLite file. Its verifier rebuilds
+the review from the original export, and its review command privately exports the
+verified queue. Historical code replay and reassessment history remain unfinished.
+
 | Stage | Working behavior | Implementation |
 | --- | --- | --- |
 | Discover | Validate local observations with synthetic, owned, or authorized scope | [Fixture discovery](engine/discovery/fixture_discovery.py) |
