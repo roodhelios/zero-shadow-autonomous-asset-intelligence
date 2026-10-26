@@ -28,6 +28,25 @@ uses native SQLite, not a database substitute. It does not collect live telemetr
 authenticate source or owner claims, perform remediation, or implement historical
 model replay. Preserve the original export and source checkout for real retained data.
 
+## Try the EC2 review comparison
+
+```bash
+python -m engine.demo_ec2_review
+```
+
+On POSIX with Python 3.11 or newer, this standard-library exercise uses only bundled
+synthetic data and temporary native SQLite. It retains two independent reviews of
+one saved EC2 batch, changes an explicitly supplied severity, removes the discovery
+database, then verifies and compares both receipts. Expect `ec2_review_exercise_passed`,
+`changed: 1`, `changed_export: rejected` and `inputs_unchanged: true`.
+No AWS credentials, network, model or cloud service is used. Fixed October 24 to 26
+fixture dates are review claims, not measurements of a live account.
+
+Use the [receipt comparison command](docs/ec2-import.md#compare-two-independent-ec2-reviews)
+for your own saved reviews. It reports changed derived decisions, added findings and
+omitted findings. Omission does not establish resolution, and comparison does not
+implement normalized reassessment history or authenticate reviewer claims.
+
 ## Follow the evidence
 
 For saved cloud inventory, the [EC2 review export](docs/ec2-import.md#export-verified-snapshots-for-review)
