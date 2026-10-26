@@ -223,3 +223,55 @@ approval, accepted ownership or remediation. A party able to replace the receipt
 all supplied evidence can construct another consistent review. Native SQLite storage
 and append-only triggers do not make those claims authentic. Historical model dispatch,
 normalized EC2 assessment persistence and multi-source identity remain future work.
+
+
+## Compare two independent EC2 reviews
+
+After retaining `/tmp/new-ec2-assessment.sqlite` above, retain a second review of the
+same discovery batch. This synthetic example advances the review date so the
+unchanged finding becomes overdue; it does not simulate a newly discovered exploit:
+
+```bash
+python -m database.ec2_assessment retain /tmp/new-ec2-inventory.sqlite examples/ec2-findings.jsonl \
+  --directory examples/ownership-directory.json --as-of 2027-01-01 \
+  --assessed-at 2027-01-01T01:00:00Z --export examples/ec2-describe-instances.json \
+  --output /tmp/new-ec2-followup.sqlite
+python -m database.ec2_assessment_compare /tmp/new-ec2-assessment.sqlite /tmp/new-ec2-followup.sqlite \
+  --export examples/ec2-describe-instances.json --output /tmp/new-ec2-comparison.json
+```
+
+Expect `ec2_assessments_compared`, `changed: 1`, `added: 0`, `omitted: 0`,
+`unchanged: 0`, `review_inputs_changed: false` and `original_export_checked: true`.
+The private JSON has `report_type: ec2-assessment-comparison`. Its sorted `changes`
+contain `finding_id`, `changed_fields`, `previous` and `current` derived decisions.
+Here `overdue` changes while technical risk and due date remain the same. Explicitly
+reviewed changes to severity or ownership can be compared using separately retained
+receipts in the same way. Changed input bytes are flagged even when decisions match.
+For a complete temporary severity-change exercise, run `python -m engine.demo_ec2_review`.
+
+Both receipts undergo complete existing reproduction, including exact source-file
+model binding, against the supplied original export before comparison. Discovery
+snapshots and context must match exactly. The current review date and assessment
+instant must not precede the previous ones. Matching finding IDs must stay attached
+to the same asset. Both receipt inputs are snapshotted by the existing verifier;
+comparison uses the verified in-memory records, not a later re-read of their paths.
+Original discovery databases and separate review-input files are not required.
+
+`added` means absent from the earlier review; `omitted` means absent from the later
+review. Neither establishes discovery time or resolution. Full decision comparison
+includes risk, priority, due date, overdue state, suggested actions and ownership
+resolution evidence. Descriptions or directory metadata may change without affecting
+these decisions; `review_inputs_changed` still records changed reviewed input bytes.
+An identical pair reports one unchanged fixture finding and empty change lists.
+
+Stdout is aggregate-only. The detailed output is a new private mode-0600 file, bounded
+to 24 MiB, and never replaces an existing path. Invalid receipts, wrong exports,
+changed model bindings, different batches or reversed dates publish no report.
+Inputs are left unchanged; no AWS calls, tickets or remediation occur. Keep detailed
+outputs private because they contain asset and finding identities and routing facts.
+
+These are two independent first-assessment receipts, not an authenticated predecessor
+chain or normalized append-only reassessment history. No new trust is created by
+comparing consistent records. Historical code replay, reviewer approval, accepted
+ownership and remediation evidence remain outside this workflow. Existing bound
+model files and receipt version 1 remain unchanged.
