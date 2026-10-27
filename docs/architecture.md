@@ -198,3 +198,17 @@ an explicit unversioned status unless `--require-model-binding` requires one. Th
 protects against silently claiming the current implementation is a retained historical
 model, but does not freeze a runtime, authenticate code or implement versioned replay.
 The manifest lists its source paths, and source-checkout files must be available.
+
+## Same-model EC2 review history
+
+`database.ec2_review_history` builds new private SQLite artifacts from independently
+reproduced version-1 EC2 receipts. Review nodes bind sequence, predecessor and receipt
+digest; normalized decision rows are keyed by revision and finding. Verification
+reproduces every receipt and compares all decision rows. The original export and exact
+current model checkout remain required. Appending requires the previous head and never
+updates a supplied history or receipt. See the [commands and bounds](ec2-import.md#retain-an-ordered-same-model-ec2-review-history).
+
+This adds bounded same-model reassessment retention, not historical model dispatch or
+authenticated lineage. A separately retained expected head can reject an older prefix;
+hashes alone cannot authenticate an author or establish the latest globally accepted
+revision. No source, identity or remediation claim gains trust merely by entering history.

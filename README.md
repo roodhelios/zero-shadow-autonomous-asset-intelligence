@@ -47,6 +47,27 @@ for your own saved reviews. It reports changed derived decisions, added findings
 omitted findings. Omission does not establish resolution, and comparison does not
 implement normalized reassessment history or authenticate reviewer claims.
 
+## Retain an ordered EC2 review history
+
+```bash
+python -m engine.demo_ec2_history
+```
+
+This standard-library POSIX exercise retains two synthetic reviews in a new private
+SQLite history, with a separate decision row per finding and revision. It deletes the
+discovery database, reproduces both reviews against the original export, rejects a
+stale predecessor and changed export bytes, and checks that its inputs remain unchanged.
+Expect `ec2_history_exercise_passed`, `review_count: 2`, `decision_count: 2`,
+`stale_predecessor: rejected` and `changed_export: rejected`. All files are temporary;
+no AWS credentials, network or cloud service is used.
+
+The [history commands](docs/ec2-import.md#retain-an-ordered-same-model-ec2-review-history)
+start or extend an artifact into a new 0600 file in an owned 0700 directory.
+An append requires the prior head digest. Reviews must use the same discovery batch
+and exact current model. Hash links establish internal consistency, not authenticated
+reviewer identity, accepted ownership, remediation, or a global latest version.
+Keep a head digest independently if you need to reject an older consistent prefix.
+
 ## Follow the evidence
 
 For saved cloud inventory, the [EC2 review export](docs/ec2-import.md#export-verified-snapshots-for-review)
@@ -63,7 +84,8 @@ For a review that must outlive the discovery database, the [EC2 assessment recei
 retains the verified discovery snapshots, exact reviewed inputs, queue decisions and
 a current model-source binding in a separate private SQLite file. Its verifier rebuilds
 the review from the original export, and its review command privately exports the
-verified queue. Historical code replay and reassessment history remain unfinished.
+verified queue. The separate history workflow orders and normalizes same-model
+reviews; historical code replay and authenticated cross-model lineage remain unfinished.
 
 | Stage | Working behavior | Implementation |
 | --- | --- | --- |
