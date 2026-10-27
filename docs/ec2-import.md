@@ -275,3 +275,61 @@ chain or normalized append-only reassessment history. No new trust is created by
 comparing consistent records. Historical code replay, reviewer approval, accepted
 ownership and remediation evidence remain outside this workflow. Existing bound
 model files and receipt version 1 remain unchanged.
+
+## Retain an ordered same-model EC2 review history
+
+Run `python -m engine.demo_ec2_history` for a complete temporary example. To retain
+your own already-created EC2 assessment receipts, first create an owned private
+directory (`mkdir -m 700 private-reviews` on POSIX). Then run:
+
+```bash
+python -m database.ec2_review_history start first-review.sqlite \
+  --export saved-export.json --output private-reviews/history-1.sqlite
+python -m database.ec2_review_history append private-reviews/history-1.sqlite next-review.sqlite \
+  --export saved-export.json --expected-head HEAD_FROM_FIRST_COMMAND \
+  --output private-reviews/history-2.sqlite
+python -m database.ec2_review_history verify private-reviews/history-2.sqlite \
+  --export saved-export.json --expected-head HEAD_FROM_APPEND_COMMAND
+```
+
+Replace the head placeholders with the exact `head_sha256` values returned by the
+respective commands. Stdout contains only schema/status, review and decision counts,
+the head digest, and original-export/head-check flags. It contains no finding, asset,
+account, owner, path or reviewed-input content. Digests and counts are still private
+operational metadata. Keep detailed files private because they retain the complete
+discovery, review inputs and decisions.
+
+Each publication creates a new mode-0600 SQLite artifact in an owned mode-0700
+directory. It never overwrites a file or updates either input. The version-1 `reviews`
+table stores ordered review payloads, receipt digests and predecessor-linked node
+digests. The `decisions` table stores one canonical decision per revision and finding,
+including asset identity. The verifier checks both tables, every receipt and node
+digest, contiguous sequence numbers and every normalized decision against a full
+rebuild using the original saved export. Existing version-1 receipts and their frozen
+model-source bindings are unchanged.
+
+All reviews must describe the same discovery context and exact current model.
+Each input retains the existing receipt contract, including at least one explicitly
+supplied finding. Empty reviews are not supported.
+Review dates and assessment instants cannot move backwards, identical receipt
+payloads cannot be appended twice, and a finding ID cannot move to another asset,
+even after being omitted in an intermediate review. Omitted findings do not establish
+resolution. Bounds are 32 reviews, 20000 total decision rows, 12 MiB combined canonical
+receipt payloads and 16 MiB per database. Histories must be owned regular mode-0600
+files; symlinks and active journal/WAL sidecars fail. Close/checkpoint a source before
+inspection. This is a closed-file workflow, not a live database service.
+
+An append requires an exact expected predecessor head. A stale head, changed export,
+tampered normalized decision, unsupported model or invalid history publishes nothing.
+Competing publications to the same output name retain one complete file; the other
+fails without overwriting it. New artifacts are fully verified and file-synced before
+exclusive publication. Parent-directory power-loss durability is not established.
+
+Hash links establish internal consistency, not authenticated approval or protection
+against an owner rewriting the entire history. `verify --expected-head` checks a
+separately retained head; without it, an older internally consistent prefix can pass.
+Protect and distribute that head independently if rollback detection matters. Different
+output paths can create forks from the same predecessor. There is no global latest-head
+registry, authenticated reviewer, accepted ownership, cross-model migration, historical
+runtime replay or remediation. Same-user path races and malicious concurrent source
+changes are outside this local cooperative-file boundary.
