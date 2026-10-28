@@ -68,6 +68,32 @@ and exact current model. Hash links establish internal consistency, not authenti
 reviewer identity, accepted ownership, remediation, or a global latest version.
 Keep a head digest independently if you need to reject an older consistent prefix.
 
+## Independently verify an EC2 history approval
+
+The optional approval workflow adds an enrolled Ed25519 key and recipient context
+to the existing history, without changing its SQLite format or model binding:
+
+```bash
+python -m pip install -r requirements-review.txt
+python -m engine.demo_ec2_approval
+```
+
+Expect `ec2_approval_exercise_passed`, `review_count: 1`,
+`negative_cases_rejected: 4` and `inputs_unchanged: true`. This POSIX exercise uses
+temporary synthetic evidence, an ephemeral signing key and native SQLite/Ed25519.
+The recipient verifies after the private signer reference is discarded. Changed
+export bytes, a wrong authority-policy pin, another recipient and an expired
+approval are rejected. No network, AWS credentials, external API or cloud service
+is used. Discarding a Python reference is not a claim of secure memory erasure.
+
+For retained artifacts, the [approval commands](docs/ec2-import.md#independent-history-approval)
+require a separately trusted authority-policy digest, explicit recipient and clock.
+Verification authenticates the enrolled key's approval of that history head, then
+reproduces every retained decision against the original export. Human identity
+enrollment, source truth, accepted ownership, global latest-head distribution and
+remediation remain outside this local workflow. Existing standard-library examples
+and unsigned history verification still work without the optional package.
+
 ## Follow the evidence
 
 For saved cloud inventory, the [EC2 review export](docs/ec2-import.md#export-verified-snapshots-for-review)

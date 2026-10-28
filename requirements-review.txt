@@ -1,0 +1,2 @@
+# Optional independent EC2 history approval. Existing fixture workflows need no package.
+PyNaCl==1.6.2

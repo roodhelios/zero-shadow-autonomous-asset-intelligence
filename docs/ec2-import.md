@@ -333,3 +333,103 @@ output paths can create forks from the same predecessor. There is no global late
 registry, authenticated reviewer, accepted ownership, cross-model migration, historical
 runtime replay or remediation. Same-user path races and malicious concurrent source
 changes are outside this local cooperative-file boundary.
+
+## Independent history approval
+
+Install the optional `requirements-review.txt` package and run
+`python -m engine.demo_ec2_approval` for a complete temporary example. It uses
+native Ed25519 through [PyNaCl's signing API](https://pynacl.readthedocs.io/en/latest/signing/),
+temporary SQLite and bundled synthetic EC2 data. Existing standard-library
+history commands remain separate and unchanged.
+
+The signer must have a privately enrolled 32-byte Ed25519 seed. The recipient
+needs only the public authority policy, approval, history and original export.
+Human enrollment and key distribution are external responsibilities. Do not
+derive trust merely by accepting a policy and digest supplied by the same
+untrusted sender. A trusted administrator must distribute the exact policy-file
+SHA-256 through an independent trusted channel, along with the intended recipient
+and an authoritative evaluation clock. Never put private seeds in Git or command
+arguments. The signing CLI reads an owned POSIX mode-0600 regular seed file with
+one hard link; final symlinks, FIFOs and oversized files fail.
+
+Policy format (replace the public-key placeholder with canonical base64 of the
+32-byte public key from your own enrollment, never a private seed):
+
+```json
+{
+  "schema_version": 1,
+  "purpose": "zero-shadow-ec2-history-approval-v1",
+  "audience": "fixture-recipient",
+  "max_validity_seconds": 3600,
+  "keys": [{
+    "key_id": "fixture-reviewer",
+    "public_key_b64": "PUBLIC_KEY_BASE64_FROM_YOUR_ENROLLMENT",
+    "state": "active",
+    "not_before": "2026-10-28T00:00:00Z",
+    "not_after": "2026-10-29T00:00:00Z"
+  }]
+}
+```
+
+These are fixed exercise times, not current validity advice. Use an appropriate
+clock and windows for your own authorized evidence. Whole-second UTC strings
+ending in `Z` are required. IDs and recipients use 3 to 64 lowercase letters,
+digits, dots, underscores or hyphens and start with a letter or digit. Policies
+contain 1 to 32 unique IDs and unique public keys. Unknown fields, duplicate JSON
+fields, non-finite values, invalid types and noncanonical base64 fail. The maximum
+approval lifetime is a policy-selected 1 to 604800 seconds. Active keys may sign;
+active or retired keys may verify within their current validity window. Revoked
+keys always fail. Issuance and expiry must fit both the policy limit and key window.
+
+After independently checking the policy pin, sign an existing closed history:
+
+```bash
+python -m database.ec2_history_approval sign private-reviews/history-2.sqlite \
+  --export saved-export.json --policy authority-policy.json \
+  --expected-policy-sha256 TRUSTED_POLICY_SHA256 --audience fixture-recipient \
+  --at 2026-10-28T01:00:00Z --issued-at 2026-10-28T01:00:00Z \
+  --expires-at 2026-10-28T02:00:00Z --key-id fixture-reviewer \
+  --seed-file private-reviews/reviewer.seed --output private-reviews/approval.json
+```
+
+The signer first reproduces the complete history, checks that its private seed
+matches the enrolled public key, and publishes a new mode-0600 approval file.
+An existing output is never overwritten. Stdout is only
+`{"schema_version": 1, "status": "ec2_history_approval_stored"}`. Transfer the
+approval, history and export privately, without transferring the seed. The recipient:
+
+```bash
+python -m database.ec2_history_approval verify private-reviews/history-2.sqlite \
+  private-reviews/approval.json --export saved-export.json --policy authority-policy.json \
+  --expected-policy-sha256 TRUSTED_POLICY_SHA256 --audience fixture-recipient \
+  --at 2026-10-28T01:30:00Z
+```
+
+Success reports `ec2_history_approval_verified`, reproduced review/decision counts,
+the head digest, authority key ID/policy digest, and original-export/head-check
+flags. No finding, account, ownership, raw signature, seed or private path reaches
+stdout. Digests, key IDs and counts are still private operational metadata. Failure
+returns code 2 with a generic message. Neither command mutates history or export.
+CLI policy/approval reads are bounded regular-file reads (64 KiB and 4 KiB);
+original exports retain the 4 MiB limit. The existing history bounds still apply.
+
+The purpose-separated signature covers the canonical approval's head, exact raw
+export SHA-256, counts, key ID, recipient, issued time and expiry. JSON whitespace
+in the approval does not matter; original export whitespace does. Verification
+checks the required policy pin, recipient, lifecycle, time and signature before
+opening the history, then checks the signed head and reproduces all decisions.
+Approval is collective for the retained history, not per-revision author identity.
+It authenticates a key enrolled in the supplied trusted policy, not a natural
+person, independent reviewer judgment, source accuracy or remediation success.
+
+The explicit clock is a trusted input, not a timestamping service or proof of when
+the signature was produced. Reusing an old policy with its matching old pin can
+bypass a later revocation unless policy freshness is enforced externally. An old
+history with its own still-valid approval can pass; no latest-head registry,
+one-time approval ledger, rollback-resistant policy distribution, cross-model
+replay or gateway service is implemented. Retain the detached approval when
+passing on verification evidence. The aggregate stdout result is unsigned.
+
+```bash
+python -m unittest discover -s tests -p test_ec2_history_approval.py -v
+```
