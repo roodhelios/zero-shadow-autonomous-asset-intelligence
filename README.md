@@ -28,6 +28,21 @@ uses native SQLite, not a database substitute. It does not collect live telemetr
 authenticate source or owner claims, perform remediation, or implement historical
 model replay. Preserve the original export and source checkout for real retained data.
 
+## Restore a retained assessment after removing the original
+
+```bash
+python -m engine.demo_assessment_backup
+```
+
+This standard-library POSIX exercise backs up a synthetic model-bound assessment,
+removes its original databases, and restores exact bytes into a separate private
+directory after full decision reproduction. Expect `assessment_backup_exercise_passed`,
+`original_databases_removed: true`, `exact_bytes_restored: true` and three rejected
+negative cases. All generated files are temporary. No external storage service is used.
+See the [backup and restore commands](docs/assessment-backup.md) for private retained
+files and independently pinned digests. This covers closed osquery first assessments,
+not active SQLite writers, EC2 histories, encryption or historical model replay.
+
 ## Try the EC2 review comparison
 
 ```bash
@@ -414,6 +429,7 @@ new, shared, and not-observed identities without inventing deletion or risk clai
 | Authenticate a snapshot | `python -m database.evidence_auth_cli --help` |
 | Check local storage | `python -m database.storage_probe --help` |
 | Exercise local SQLite persistence | `python -m database.sqlite_probe --help` |
+| Back up or restore a closed assessment | `python -m database.assessment_backup --help` |
 | Inspect a complete fixture workflow | [Workflow spec](examples/workflow-spec.json) |
 
 Key lifecycle metadata rejects non-string operations and states, boolean schema
@@ -613,8 +629,10 @@ The local fixture pipeline, saved osquery JSON import and bounded saved EC2 impo
 Live AWS/network connectors and some infrastructure files remain unimplemented. Live osquery
 collection is not implemented; the importer reads only a supplied local file.
 The workflow CLI and disposable local SQLite process-lock/recovery probe are available.
-Backup/restore and deployed Airflow persistence remain unvalidated. Validate those
-boundaries before connecting an authorized external discovery source.
+Closed model-bound osquery assessments have an offline backup/restore workflow with
+strict reproduction. EC2/history archives, portable model dependencies, live database
+backup and deployed Airflow persistence remain unfinished. Validate those boundaries
+before connecting an authorized external discovery source.
 
 See the [threat model](docs/threat-model.md), [design decisions](docs/design-decisions.md),
 and [remediation policy](docs/remediation-model.md). This is an ongoing implementation
