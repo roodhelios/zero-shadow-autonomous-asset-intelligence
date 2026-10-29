@@ -159,6 +159,12 @@ Inspect the file before using it as a task list. No tickets or notifications are
 
 ## Validate locally
 
+Before retaining evidence on a new local volume, run the
+[disposable SQLite deployment exercise](docs/sqlite-deployment.md). It checks native
+cross-process writer exclusion, rollback after abrupt process exit, integrity and a
+fresh committed write. It uses only temporary synthetic rows, preserves existing
+files and does not claim power-loss durability or validate a network filesystem.
+
 Run the complete fixture pipeline without Airflow:
 
 ```bash
@@ -407,6 +413,7 @@ new, shared, and not-observed identities without inventing deletion or risk clai
 | Compare snapshots | `python -m database.evidence_diff_cli --help` |
 | Authenticate a snapshot | `python -m database.evidence_auth_cli --help` |
 | Check local storage | `python -m database.storage_probe --help` |
+| Exercise local SQLite persistence | `python -m database.sqlite_probe --help` |
 | Inspect a complete fixture workflow | [Workflow spec](examples/workflow-spec.json) |
 
 Key lifecycle metadata rejects non-string operations and states, boolean schema
@@ -605,7 +612,8 @@ against the separately supplied original export before reporting success.
 The local fixture pipeline, saved osquery JSON import and bounded saved EC2 import work.
 Live AWS/network connectors and some infrastructure files remain unimplemented. Live osquery
 collection is not implemented; the importer reads only a supplied local file.
-The workflow CLI is available; next work should validate deployment and persistence
+The workflow CLI and disposable local SQLite process-lock/recovery probe are available.
+Backup/restore and deployed Airflow persistence remain unvalidated. Validate those
 boundaries before connecting an authorized external discovery source.
 
 See the [threat model](docs/threat-model.md), [design decisions](docs/design-decisions.md),
