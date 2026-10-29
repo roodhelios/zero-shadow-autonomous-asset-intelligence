@@ -78,6 +78,8 @@ database owner, or change the existing inventory/assessment contracts.
 
 Run the [retained inventory exercise](../README.md#try-the-complete-retained-inventory-exercise)
 after storage checks to test the application path. Preserve frozen model source files
-with retained assessments. Next work should exercise a recoverable backup/restore
-workflow for retained evidence on a separately selected local directory before adding
-an authorized external discovery connector.
+with retained assessments. The [closed-assessment backup/restore workflow](assessment-backup.md)
+now exercises restoration after removing the original databases, using independently
+pinned backup bytes and the original export. EC2/history archives, portable model
+dependencies, online backup and deployed storage still need separate validation before
+adding an authorized external discovery connector.
