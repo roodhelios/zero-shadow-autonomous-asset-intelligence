@@ -102,6 +102,7 @@ not validate EC2 assessment/history backup, legacy unbound assessments, cloud ba
 encryption, retention policy, device failure or secure deletion. The three directories
 in the exercise are on one local filesystem, not separate failure domains.
 
-Next: define a local archive contract that retains the original export and exact
-model checkout alongside the assessed database, then test restore with those explicit
-dependencies. Do not claim portable historical replay until model dispatch exists.
+For one private file retaining the original export and an allowlisted model/runtime
+source snapshot, use the [assessment archive](assessment-archive.md). Its native exercise
+restores after original database/export removal. Archived code is never executed and
+restore still requires matching trusted code; historical model dispatch remains unfinished.

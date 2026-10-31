@@ -43,6 +43,19 @@ See the [backup and restore commands](docs/assessment-backup.md) for private ret
 files and independently pinned digests. This covers closed osquery first assessments,
 not active SQLite writers, EC2 histories, encryption or historical model replay.
 
+## Retain the assessment and its replay dependencies together
+
+```bash
+python -m engine.demo_assessment_archive
+```
+
+Expect `assessment_archive_exercise_passed`: the original assessment and export file
+are removed, then exact database bytes are restored from one private archive after
+full model-bound replay. The [archive guide](docs/assessment-archive.md) covers retained
+export/source entries, independent digest pins and matching trusted checkout checks.
+Archived code remains data and is never executed. This standard-library local workflow
+adds portable retention, not encryption, historical dispatch or a deployed backup service.
+
 ## Try the EC2 review comparison
 
 ```bash
@@ -630,8 +643,10 @@ Live AWS/network connectors and some infrastructure files remain unimplemented. 
 collection is not implemented; the importer reads only a supplied local file.
 The workflow CLI and disposable local SQLite process-lock/recovery probe are available.
 Closed model-bound osquery assessments have an offline backup/restore workflow with
-strict reproduction. EC2/history archives, portable model dependencies, live database
-backup and deployed Airflow persistence remain unfinished. Validate those boundaries
+strict reproduction. A private archive can now retain original export bytes and an
+allowlisted source snapshot with the assessment; restore requires a matching trusted
+checkout and independent archive digest. EC2/history archives, historical model dispatch,
+live database backup and deployed Airflow persistence remain unfinished. Validate those boundaries
 before connecting an authorized external discovery source.
 
 See the [threat model](docs/threat-model.md), [design decisions](docs/design-decisions.md),
