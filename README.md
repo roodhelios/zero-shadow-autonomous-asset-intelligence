@@ -71,6 +71,21 @@ The [discovery comparison guide](docs/ec2-discovery-comparison.md) explains priv
 retained commands, original row references and selected-field limits. Not observed
 does not mean deleted or resolved; this does not assess risk or accepted ownership.
 
+## Review a sequence of saved EC2 observations
+
+```bash
+python -m engine.demo_ec2_timeline
+```
+
+This standard-library POSIX exercise reproduces four temporary discovery databases
+against their respective original exports. Expect `ec2_timeline_exercise_passed`,
+four batches, three source-claimed identities and one `observed_again` event after
+two omitted batches. It verifies the complete retained report under an independent
+digest pin, rejects three negative cases and preserves its input databases.
+The [timeline guide](docs/ec2-observation-timeline.md) explains private commands,
+last-observation references, ordered source requirements and incomplete-collection
+limits. Observed again does not mean recreated or recovered. No AWS calls occur.
+
 ## Try the EC2 review comparison
 
 ```bash
