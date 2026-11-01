@@ -56,6 +56,21 @@ export/source entries, independent digest pins and matching trusted checkout che
 Archived code remains data and is never executed. This standard-library local workflow
 adds portable retention, not encryption, historical dispatch or a deployed backup service.
 
+## Compare later saved EC2 discoveries
+
+```bash
+python -m engine.demo_ec2_discovery_compare
+```
+
+This standard-library POSIX exercise reproduces two retained discovery databases
+against their respective original exports, then compares selected instance claims.
+Expect `ec2_discovery_comparison_exercise_passed`, `added: 1`, `not_observed: 1`,
+`changed: 1` and `inputs_unchanged: true`. Only temporary synthetic data and native
+SQLite are used. No account, credential or AWS endpoint is contacted.
+The [discovery comparison guide](docs/ec2-discovery-comparison.md) explains private
+retained commands, original row references and selected-field limits. Not observed
+does not mean deleted or resolved; this does not assess risk or accepted ownership.
+
 ## Try the EC2 review comparison
 
 ```bash
