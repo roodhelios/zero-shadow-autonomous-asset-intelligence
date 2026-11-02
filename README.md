@@ -86,6 +86,20 @@ The [timeline guide](docs/ec2-observation-timeline.md) explains private commands
 last-observation references, ordered source requirements and incomplete-collection
 limits. Observed again does not mean recreated or recovered. No AWS calls occur.
 
+## Check which expected EC2 batches were supplied
+
+```bash
+python -S -m engine.demo_ec2_checkpoint
+```
+
+Expect `ec2_sequence_checkpoint_exercise_passed`, three expected batches, two supplied
+partial batches and one missing expected batch. The gap report reproduces, and the
+complete sequence satisfies the same checkpoint. This standard-library exercise uses
+native temporary SQLite and original synthetic exports. The
+[recipient checkpoint guide](docs/ec2-sequence-checkpoint.md) shows exact expectations,
+independent pins and private retained commands. Missing means not supplied, not failed
+collection. Current checkpoint distribution and source authenticity remain external.
+
 ## Try the EC2 review comparison
 
 ```bash
