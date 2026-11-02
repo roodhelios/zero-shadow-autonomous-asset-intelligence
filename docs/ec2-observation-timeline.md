@@ -124,6 +124,8 @@ allowlists are unchanged.
 python -S -m unittest discover -s tests -p 'test_ec2_observation_timeline.py' -v
 ```
 
-Next: define independently controlled sequence checkpoints and missing-collection
-handling before retaining an authoritative discovery history. Prepared with assistant
+A separate [recipient checkpoint review](ec2-sequence-checkpoint.md) now compares
+expected time/export slots with the supplied sequence and retains explicit gaps.
+Independent issuer enrollment, checkpoint freshness/distribution and future
+collection scheduling remain unfinished before authoritative discovery history. Prepared with assistant
 support and original synthetic fixtures.
