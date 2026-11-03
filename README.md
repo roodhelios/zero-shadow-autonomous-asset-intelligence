@@ -100,6 +100,19 @@ native temporary SQLite and original synthetic exports. The
 independent pins and private retained commands. Missing means not supplied, not failed
 collection. Current checkpoint distribution and source authenticity remain external.
 
+## Restore an EC2 sequence without its original files
+
+```bash
+python -S -m engine.demo_ec2_archive
+```
+
+Expect `ec2_sequence_archive_exercise_passed`, two supplied batches, three expected
+batches, one missing batch and `exact_bytes_restored: true`. This temporary native
+SQLite exercise removes original databases/exports, restores them from one private
+archive and reproduces the gap report. The [archive guide](docs/ec2-sequence-archive.md)
+shows retained commands, independent archive/checkpoint pins, matching-checkout
+checks and completion limits. Archived code is data only. No AWS call occurs.
+
 ## Try the EC2 review comparison
 
 ```bash
@@ -689,7 +702,9 @@ The workflow CLI and disposable local SQLite process-lock/recovery probe are ava
 Closed model-bound osquery assessments have an offline backup/restore workflow with
 strict reproduction. A private archive can now retain original export bytes and an
 allowlisted source snapshot with the assessment; restore requires a matching trusted
-checkout and independent archive digest. EC2/history archives, historical model dispatch,
+checkout and independent archive digest. EC2 discovery sequences now retain closed
+databases, original exports, recipient expectations and coverage together under
+independent pins. EC2 assessment-history archives, historical model dispatch,
 live database backup and deployed Airflow persistence remain unfinished. Validate those boundaries
 before connecting an authorized external discovery source.
 
