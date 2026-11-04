@@ -161,7 +161,9 @@ independently controlled digest store before using a diff for enforcement.
 - Append-only triggers protect normal SQL statements, not an administrator who can
   replace the database file or alter the schema.
 - Snapshot digests expose changed files but do not authenticate the exporter.
-- No retention, encryption, backup, or access-control policy is implemented here.
+- Closed local osquery assessments and EC2 review histories have verified copy
+  workflows. Automatic retention, encryption, external backup and access-control
+  policies remain outside this implementation. See [EC2 history copies](ec2-history-backup.md).
 
 
 ## First retained inventory assessment

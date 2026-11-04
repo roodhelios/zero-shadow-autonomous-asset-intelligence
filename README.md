@@ -153,6 +153,20 @@ and exact current model. Hash links establish internal consistency, not authenti
 reviewer identity, accepted ownership, remediation, or a global latest version.
 Keep a head digest independently if you need to reject an older consistent prefix.
 
+## Back up and restore a closed EC2 review history
+
+```bash
+python -S -m engine.demo_ec2_history_backup
+```
+
+Expect `ec2_history_backup_exercise_passed`, two reviews, two decision rows,
+`original_history_removed: true`, `exact_bytes_restored: true` and three rejected
+negative cases. This standard-library POSIX exercise uses native temporary SQLite,
+the original synthetic export and a current model checkout. No AWS calls occur.
+The [history backup guide](docs/ec2-history-backup.md) shows retained commands and
+independent database/head pins. The export remains a separate required replay input;
+this does not archive dependencies, back up active writers or establish the latest head.
+
 ## Independently verify an EC2 history approval
 
 The optional approval workflow adds an enrolled Ed25519 key and recipient context
@@ -704,7 +718,9 @@ strict reproduction. A private archive can now retain original export bytes and 
 allowlisted source snapshot with the assessment; restore requires a matching trusted
 checkout and independent archive digest. EC2 discovery sequences now retain closed
 databases, original exports, recipient expectations and coverage together under
-independent pins. EC2 assessment-history archives, historical model dispatch,
+independent pins. Closed EC2 review histories also have a separate exact-copy
+backup/restore command that requires the original export and an independent history
+head. EC2 assessment-history archives, historical model dispatch,
 live database backup and deployed Airflow persistence remain unfinished. Validate those boundaries
 before connecting an authorized external discovery source.
 
