@@ -214,3 +214,15 @@ This adds bounded same-model reassessment retention, not historical model dispat
 authenticated lineage. A separately retained expected head can reject an older prefix;
 hashes alone cannot authenticate an author or establish the latest globally accepted
 revision. No source, identity or remediation claim gains trust merely by entering history.
+
+
+## Portable closed EC2 review-history retention
+
+`database.ec2_history_archive` retains the exact closed history, its original export
+and allowlisted replay source bytes in one private bounded JSON archive. Independent
+archive and history-head pins, source equality and full current-model decision replay
+are required before restoration. The restored private directory receives history,
+export and a last-written completion record. Archived source remains data, never
+executed. This extends the separate history-copy workflow without changing the
+review schema or declaring authenticated identity, pin freshness or active backup.
+See [commands, walkthrough and failure boundaries](ec2-history-archive.md).

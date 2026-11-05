@@ -82,8 +82,10 @@ authenticated reviewer identity, accepted ownership or remediation. File sync do
 not sync the parent directory or establish power-loss durability. Abrupt process
 exit may leave a staging file. A same-user editor can replace files or pins. A stale
 database and its own stale head/digest can match; latest-head enrollment and fresh
-pin distribution remain external. Preserve the export separately. A portable EC2
-history archive with its replay dependencies remains unfinished.
+pin distribution remain external. Preserve the export separately for this exact-copy
+workflow. The
+[separate history archive](ec2-history-archive.md) retains the export and replay
+source bytes together; it does not add historical dispatch or pin freshness.
 
 ```bash
 python -m unittest discover -s tests -p test_ec2_history_backup.py -v
