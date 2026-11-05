@@ -167,6 +167,22 @@ The [history backup guide](docs/ec2-history-backup.md) shows retained commands a
 independent database/head pins. The export remains a separate required replay input;
 this does not archive dependencies, back up active writers or establish the latest head.
 
+## Retain an EC2 review history and its replay inputs together
+
+```bash
+python -S -m engine.demo_ec2_history_archive
+```
+
+Expect `ec2_history_archive_exercise_passed`, two reviews, two decisions,
+`original_history_removed: true`, `original_export_removed: true` and
+`exact_bytes_restored: true`. The standard-library POSIX walkthrough removes the
+original history and export, then restores both exact byte streams from one private
+archive after full current-model replay. Three negative cases are rejected.
+The [EC2 history archive guide](docs/ec2-history-archive.md) shows retained commands,
+independent archive/head pins and source matching. Archived code remains data and
+is never executed. This adds portable local retention, not pin freshness, source
+authentication, historical dispatch or active database backup. No AWS calls occur.
+
 ## Independently verify an EC2 history approval
 
 The optional approval workflow adds an enrolled Ed25519 key and recipient context
@@ -720,9 +736,11 @@ checkout and independent archive digest. EC2 discovery sequences now retain clos
 databases, original exports, recipient expectations and coverage together under
 independent pins. Closed EC2 review histories also have a separate exact-copy
 backup/restore command that requires the original export and an independent history
-head. EC2 assessment-history archives, historical model dispatch,
-live database backup and deployed Airflow persistence remain unfinished. Validate those boundaries
-before connecting an authorized external discovery source.
+head. A separate EC2 history archive now retains the export and replay source bytes
+together and restores only against independent archive/head pins and a matching
+trusted checkout. Historical model dispatch, live database backup and deployed
+Airflow persistence remain unfinished. Validate those boundaries before connecting
+an authorized external discovery source.
 
 See the [threat model](docs/threat-model.md), [design decisions](docs/design-decisions.md),
 and [remediation policy](docs/remediation-model.md). This is an ongoing implementation
