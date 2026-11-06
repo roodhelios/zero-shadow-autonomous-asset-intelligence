@@ -111,8 +111,10 @@ publish a whole directory, sync parent directories or guarantee power-loss
 durability. Abrupt exit can leave partial directories or staging files; a missing
 completion record means the restore did not finish. No active-writer lock is held.
 
-Next: independent history-head enrollment and fresh checkpoint distribution before
-treating a restored history as the currently accepted revision.
+The separate [history enrollment workflow](ec2-history-enrollment.md) can now bind
+a selected history revision and advance along its reproduced lineage. Its record
+must be retained and pinned independently from an archive. Fresh selection
+distribution remains unfinished; an archive does not select the latest revision.
 
 ```bash
 python -S -m unittest discover -s tests -p test_ec2_history_archive.py -v

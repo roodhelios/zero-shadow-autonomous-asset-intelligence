@@ -183,6 +183,23 @@ independent archive/head pins and source matching. Archived code remains data an
 is never executed. This adds portable local retention, not pin freshness, source
 authentication, historical dispatch or active database backup. No AWS calls occur.
 
+## Select and advance a reproduced EC2 history revision
+
+```bash
+python -S -m engine.demo_ec2_enrollment
+```
+
+Expect `ec2_history_enrollment_exercise_passed`, selection revision 2, two reviews
+and four rejected negative cases. A private enrollment record binds the exact
+selected history, original export, discovery/model context and logical head. Advancing
+requires the prior pinned history to be an exact logical prefix of the new one.
+The walkthrough removes the selected history and verifies its exact backup copy.
+It also demonstrates that an old record can still verify its own old history.
+The [enrollment guide](docs/ec2-history-enrollment.md) gives retained commands and
+limits. This standard-library exercise uses synthetic data and native temporary
+SQLite. Local selection does not establish reviewer identity, journal ownership
+or the latest accepted head. No AWS calls occur.
+
 ## Independently verify an EC2 history approval
 
 The optional approval workflow adds an enrolled Ed25519 key and recipient context
@@ -738,8 +755,11 @@ independent pins. Closed EC2 review histories also have a separate exact-copy
 backup/restore command that requires the original export and an independent history
 head. A separate EC2 history archive now retains the export and replay source bytes
 together and restores only against independent archive/head pins and a matching
-trusted checkout. Historical model dispatch, live database backup and deployed
-Airflow persistence remain unfinished. Validate those boundaries before connecting
+trusted checkout. A separate pinned selection record now enrolls an exact history
+revision and permits advancement only along its reproduced logical lineage.
+Current selection distribution and freshness remain external. Historical model
+dispatch, live database backup and deployed Airflow persistence remain unfinished.
+Validate those boundaries before connecting
 an authorized external discovery source.
 
 See the [threat model](docs/threat-model.md), [design decisions](docs/design-decisions.md),
