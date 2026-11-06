@@ -226,3 +226,14 @@ export and a last-written completion record. Archived source remains data, never
 executed. This extends the separate history-copy workflow without changing the
 review schema or declaring authenticated identity, pin freshness or active backup.
 See [commands, walkthrough and failure boundaries](ec2-history-archive.md).
+
+## Selected EC2 history lineage
+
+`database.ec2_history_enrollment` captures and replays a closed history before
+publishing a separate private selection record. An independent record pin binds
+the exact database/export bytes, logical head, discovery and model. Advancement
+requires a strictly longer reproduced history whose prefix matches the selected
+prior head and counts. Records retain their local label and predecessor digest;
+they do not modify history tables or the archived replay-source contract. Exact
+backup copies can verify against the same selection. Selection authentication and
+fresh distribution remain external. See [enrollment and limits](ec2-history-enrollment.md).
