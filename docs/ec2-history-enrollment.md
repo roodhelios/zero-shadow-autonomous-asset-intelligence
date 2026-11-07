@@ -122,3 +122,27 @@ or historical model dispatch is added.
 
 Next: define independently authenticated selection distribution and rollback
 prevention before treating a record as the latest accepted revision.
+
+## Authenticate the selected enrollment
+
+The existing Ed25519 history approval commands accept two additional arguments
+on both `sign` and `verify`:
+
+```text
+--enrollment /private/selection.json --expected-enrollment-sha256 SELECTION_PIN
+```
+
+Use the history, export, policy, audience, clock, and seed setup from the
+[history approval workflow](../README.md#independently-verify-an-ec2-history-approval).
+Use the selection pin obtained independently from the file being checked.
+Signing first verifies the exact enrollment against the retained SQLite bytes
+and original export. Verification requires the same enrollment and pin, the
+signed approval, and the pinned authority policy; it does not need the seed.
+
+Expect a version 2 approval and verification status
+`ec2_history_selection_authenticated`. A history-only version 1 approval is
+still valid for its original use but cannot satisfy a request with an enrollment
+pin. A different enrollment of the same history also fails. The verifier trusts
+the supplied policy, audience, clock and selection pin. It cannot discover a newer
+selection, prevent rollback of those trusted inputs, or authenticate AWS export
+provenance.

@@ -195,6 +195,8 @@ selected history, original export, discovery/model context and logical head. Adv
 requires the prior pinned history to be an exact logical prefix of the new one.
 The walkthrough removes the selected history and verifies its exact backup copy.
 It also demonstrates that an old record can still verify its own old history.
+An [Ed25519 selection approval](docs/ec2-history-enrollment.md#authenticate-the-selected-enrollment)
+can bind the exact enrollment under a pinned authority policy.
 The [enrollment guide](docs/ec2-history-enrollment.md) gives retained commands and
 limits. This standard-library exercise uses synthetic data and native temporary
 SQLite. Local selection does not establish reviewer identity, journal ownership

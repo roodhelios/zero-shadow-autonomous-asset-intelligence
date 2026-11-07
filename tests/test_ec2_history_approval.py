@@ -176,6 +176,57 @@ class HistoryApprovalTests(unittest.TestCase):
         for hidden in ('111122223333', str(self.root), 'signature_b64', 'private_key'):
             self.assertNotIn(hidden, stdout.getvalue()+stderr.getvalue())
 
+    def selection(self, name):
+        from database.ec2_history_enrollment import enroll_history
+        from database.ec2_review_history import verify_history
+
+        path = self.root/name
+        head = verify_history(self.history, export_data=EXPORT)['head_sha256']
+        receipt = enroll_history(self.history, path, export_data=EXPORT, expected_head=head)
+        return path, dict(enrollment_data=path.read_bytes(),
+                          expected_enrollment_sha256=receipt['enrollment_sha256'])
+
+    def test_selection_cannot_be_replaced_or_downgraded(self):
+        _, selected = self.selection('selected')
+        _, other = self.selection('different')
+        signed = self.encoded(self.sign(**selected))
+        shared = self.shared()
+        result = verify_approval(self.history, signed, **shared, **selected)
+        self.assertEqual(result['status'], 'ec2_history_selection_authenticated')
+        self.assertFalse(result['latest_head_established'])
+        with patch('database.ec2_history_approval.verify_enrollment',
+                   side_effect=AssertionError('history opened before selection or signature was checked')):
+            for data, options in ((signed, other), (signed, {}), (self.encoded(), selected),
+                                  (self.encoded(dict(json.loads(signed),
+                                      signature_b64=base64.b64encode(bytes(64)).decode())), selected)):
+                with self.subTest(options=list(options)), self.assertRaises(ValueError):
+                    verify_approval(self.history, data, **shared, **options)
+
+    def test_selection_cli_signs_and_verifies_exact_enrollment(self):
+        path, selected = self.selection('selected')
+        policy = self.root/'policy.json'
+        policy.write_bytes(self.shared()['policy_data'])
+        seed = self.root/'seed'
+        seed.write_bytes(self.signer.encode())
+        seed.chmod(0o600)
+        output = self.root/'approval.json'
+        common = ['--export', str(self.source), '--policy', str(policy), '--expected-policy-sha256',
+                  self.shared()['expected_policy_sha256'], '--audience', 'fixture-recipient',
+                  '--at', '2026-10-28T01:00:00Z', '--enrollment', str(path),
+                  '--expected-enrollment-sha256', selected['expected_enrollment_sha256']]
+        with redirect_stdout(StringIO()):
+            self.assertEqual(main(['sign', str(self.history), *common, '--seed-file', str(seed),
+                '--key-id', 'fixture-reviewer', '--issued-at', '2026-10-28T01:00:00Z',
+                '--expires-at', '2026-10-28T02:00:00Z', '--output', str(output)]), 0)
+        self.assertEqual(json.loads(output.read_bytes())['schema_version'], 2)
+        seed.unlink()
+        stdout = StringIO()
+        with redirect_stdout(stdout):
+            self.assertEqual(main(['verify', str(self.history), str(output), *common]), 0)
+        self.assertEqual(json.loads(stdout.getvalue())['status'], 'ec2_history_selection_authenticated')
+        with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+            self.assertEqual(main(['verify', str(self.histories[0]), str(output), *common]), 2)
+
     def test_demo(self):
         from engine.demo_ec2_approval import exercise
         result = exercise()

@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from database.ec2_assessment import _canonical
+from database.ec2_history_enrollment import read_enrollment, verify_enrollment
 from database.ec2_review_history import _check_digest, verify_history
 from engine.discovery.osquery_collector import MAX_INPUT_BYTES, _publish, _read, _unique_fields
 
@@ -21,6 +22,8 @@ DOMAIN = PURPOSE.encode("ascii") + b"\x00"
 IDENTIFIER = re.compile(r"[a-z0-9][a-z0-9._-]{2,63}", re.ASCII)
 FIELDS = {"schema_version", "purpose", "key_id", "audience", "head_sha256", "export_sha256",
           "review_count", "decision_count", "issued_at", "expires_at", "signature_b64"}
+
+SELECTION_FIELDS = FIELDS | {"enrollment_sha256"}
 
 
 def _crypto():
@@ -97,9 +100,13 @@ def _policy(data, pin, audience, key_id, at, *, signing=False):
 
 
 def _context(approval, key, maximum, at):
-    if (set(approval) != FIELDS or type(approval["schema_version"]) is not int or
-            approval["schema_version"] != 1 or approval["purpose"] != PURPOSE):
+    version = approval.get("schema_version")
+    if (type(version) is not int or version not in (1, 2) or
+            set(approval) != (SELECTION_FIELDS if version == 2 else FIELDS) or
+            approval["purpose"] != PURPOSE):
         raise ValueError("unsupported history approval")
+    if version == 2:
+        _check_digest(approval["enrollment_sha256"])
     _check_digest(approval["head_sha256"]); _check_digest(approval["export_sha256"])
     for field, limit in (("review_count", 32), ("decision_count", 20000)):
         if type(approval[field]) is not int or not 1 <= approval[field] <= limit:
@@ -111,7 +118,8 @@ def _context(approval, key, maximum, at):
 
 
 def _message(approval):
-    return DOMAIN + _canonical({k: v for k, v in approval.items() if k != "signature_b64"}).encode("ascii")
+    domain = DOMAIN if approval["schema_version"] == 1 else b"zero-shadow-ec2-history-selection-v2\x00"
+    return domain + _canonical({k: v for k, v in approval.items() if k != "signature_b64"}).encode("ascii")
 
 
 def _export(data):
@@ -120,8 +128,17 @@ def _export(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def _selection_options(enrollment_data, expected_enrollment_sha256):
+    if enrollment_data is None and expected_enrollment_sha256 is None:
+        return None
+    _check_digest(expected_enrollment_sha256)
+    if not isinstance(enrollment_data, bytes):
+        raise ValueError("enrollment and independent pin must be supplied together")
+    return dict(enrollment_data=enrollment_data, expected_enrollment_sha256=expected_enrollment_sha256)
+
+
 def approve_history(history, *, export_data, policy_data, expected_policy_sha256, audience,
-                    key_id, seed, issued_at, expires_at, at):
+                    key_id, seed, issued_at, expires_at, at, enrollment_data=None, expected_enrollment_sha256=None):
     """Sign only after full same-model reproduction under an active enrolled key."""
     key, maximum = _policy(policy_data, expected_policy_sha256, audience, key_id, at, signing=True)
     SigningKey, _ = _crypto()
@@ -131,21 +148,33 @@ def approve_history(history, *, export_data, policy_data, expected_policy_sha256
     if signer.verify_key.encode() != _decode(key["public_key_b64"], 32):
         raise ValueError("private seed does not match the enrolled key")
     export_digest = _export(export_data)
-    report = verify_history(history, export_data=export_data)
+    selection = _selection_options(enrollment_data, expected_enrollment_sha256)
+    if selection is None:
+        report = verify_history(history, export_data=export_data)
+    else:
+        report = verify_enrollment(history, export_data=export_data, **selection)
     approval = {"schema_version": 1, "purpose": PURPOSE, "key_id": key_id, "audience": audience,
                 "head_sha256": report["head_sha256"], "export_sha256": export_digest,
                 "review_count": report["review_count"], "decision_count": report["decision_count"],
                 "issued_at": issued_at, "expires_at": expires_at, "signature_b64": ""}
+    if selection is not None:
+        approval.update(schema_version=2, enrollment_sha256=expected_enrollment_sha256)
     _context(approval, key, maximum, at)
     approval["signature_b64"] = base64.b64encode(signer.sign(_message(approval)).signature).decode("ascii")
     return approval
 
 
-def verify_approval(history, approval_data, *, export_data, policy_data, expected_policy_sha256, audience, at):
+def verify_approval(history, approval_data, *, export_data, policy_data, expected_policy_sha256, audience, at,
+                    enrollment_data=None, expected_enrollment_sha256=None):
     """Authenticate approval context, then reproduce every retained decision."""
     approval = _json(approval_data, 4096)
-    if set(approval) != FIELDS:
-        raise ValueError("unsupported history approval fields")
+    selection = _selection_options(enrollment_data, expected_enrollment_sha256)
+    if selection is None:
+        if set(approval) != FIELDS or approval.get("schema_version") != 1:
+            raise ValueError("expected a history-only approval")
+    elif (set(approval) != SELECTION_FIELDS or approval.get("schema_version") != 2 or
+            approval.get("enrollment_sha256") != expected_enrollment_sha256):
+        raise ValueError("approval does not bind the independently selected enrollment")
     key, maximum = _policy(policy_data, expected_policy_sha256, audience, approval["key_id"], at)
     if approval["audience"] != audience:
         raise ValueError("approval belongs to another recipient")
@@ -158,11 +187,19 @@ def verify_approval(history, approval_data, *, export_data, policy_data, expecte
         raise ValueError("history approval signature did not verify") from None
     if _export(export_data) != approval["export_sha256"]:
         raise ValueError("original export differs from the approved bytes")
-    report = verify_history(history, export_data=export_data, expected_head=approval["head_sha256"])
-    if any(report[field] != approval[field] for field in ("review_count", "decision_count")):
-        raise ValueError("approved counts did not reproduce")
-    return dict(report, status="ec2_history_approval_verified", authority_key_id=approval["key_id"],
-                authority_policy_sha256=expected_policy_sha256)
+    if selection is None:
+        report = verify_history(history, export_data=export_data, expected_head=approval["head_sha256"])
+    else:
+        report = verify_enrollment(history, export_data=export_data, **selection)
+    if any(report[field] != approval[field] for field in ("head_sha256", "review_count", "decision_count")):
+        raise ValueError("approved head or counts did not reproduce")
+    result = dict(report, status="ec2_history_approval_verified", authority_key_id=approval["key_id"],
+                  authority_policy_sha256=expected_policy_sha256)
+    if selection is not None:
+        result.update(status="ec2_history_selection_authenticated",
+                      interpretation="The pinned authority signed this independently selected enrollment. "
+                      "This does not discover a newer selection or authenticate the export source.")
+    return result
 
 
 def _file(path, limit, *, private=False):
@@ -198,16 +235,23 @@ def main(argv=None):
         sub.add_argument("--policy", type=Path, required=True)
         sub.add_argument("--expected-policy-sha256", required=True)
         sub.add_argument("--audience", required=True)
+        sub.add_argument("--enrollment", type=Path)
+        sub.add_argument("--expected-enrollment-sha256")
         sub.add_argument("--at", required=True, help="explicit trusted evaluation clock; UTC seconds ending in Z")
     args = parser.parse_args(argv)
     try:
         shared = dict(export_data=_read(args.export), policy_data=_file(args.policy, 64 * 1024),
                       expected_policy_sha256=args.expected_policy_sha256, audience=args.audience, at=args.at)
+        if bool(args.enrollment) != bool(args.expected_enrollment_sha256):
+            raise ValueError("enrollment and independent pin must be supplied together")
+        if args.enrollment:
+            shared.update(enrollment_data=read_enrollment(args.enrollment),
+                          expected_enrollment_sha256=args.expected_enrollment_sha256)
         if args.command == "sign":
             approval = approve_history(args.history, **shared, seed=_file(args.seed_file, 32, private=True),
                 key_id=args.key_id, issued_at=args.issued_at, expires_at=args.expires_at)
             _publish(args.output, _canonical(approval)+"\n")
-            result = {"schema_version": 1, "status": "ec2_history_approval_stored"}
+            result = {"schema_version": approval["schema_version"], "status": "ec2_history_approval_stored"}
         else:
             result = verify_approval(args.history, _file(args.approval, 4096), **shared)
     except (OSError, ValueError, TypeError, KeyError, sqlite3.DatabaseError, UnicodeError,
