@@ -66,6 +66,26 @@ class EnrollmentTests(unittest.TestCase):
             self.verify(enrollment_data=data, expected_enrollment_sha256=enrollment._digest(data))
         self.assertEqual(self.verify()['review_count'], 1)
 
+    def test_verify_against_previous_checkpoint_rejects_rollback_and_false_prefix(self):
+        self.advance()
+        data = self.advanced.read_bytes()
+        prior = dict(previous_enrollment_data=self.data, expected_previous_sha256=self.pin)
+        verified = self.verify(self.histories[1], enrollment_data=data,
+                               expected_enrollment_sha256=enrollment._digest(data), **prior)
+        self.assertTrue(verified['previous_checkpoint_verified'])
+        self.assertFalse(verified['latest_head_established'])
+        with self.assertRaisesRegex(ValueError, 'does not directly advance'):
+            self.verify(previous_enrollment_data=data, expected_previous_sha256=enrollment._digest(data))
+
+        # Matching revision and predecessor digest alone cannot establish a history prefix.
+        wrong_prior = enrollment._bytes(dict(json.loads(self.data), head_sha256='0'*64))
+        wrong_pin = enrollment._digest(wrong_prior)
+        forged_link = enrollment._bytes(dict(json.loads(data), previous_enrollment_sha256=wrong_pin))
+        with self.assertRaisesRegex(ValueError, 'not an extension'):
+            self.verify(self.histories[1], enrollment_data=forged_link,
+                        expected_enrollment_sha256=enrollment._digest(forged_link),
+                        previous_enrollment_data=wrong_prior, expected_previous_sha256=wrong_pin)
+
     def test_same_or_shorter_history_cannot_advance(self):
         with self.assertRaises(ValueError): self.advance(0)
         self.advance(); data = self.advanced.read_bytes()

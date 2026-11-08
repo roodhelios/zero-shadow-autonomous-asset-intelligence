@@ -120,8 +120,7 @@ no other selection branch exists. Keep records and pins privately and independen
 No signing keys, credential rotation, history rewrite, deployed service, live backup
 or historical model dispatch is added.
 
-Next: define independently authenticated selection distribution and rollback
-prevention before treating a record as the latest accepted revision.
+See below for signed successor verification against a separately retained checkpoint.
 
 ## Authenticate the selected enrollment
 
@@ -146,3 +145,28 @@ pin. A different enrollment of the same history also fails. The verifier trusts
 the supplied policy, audience, clock and selection pin. It cannot discover a newer
 selection, prevent rollback of those trusted inputs, or authenticate AWS export
 provenance.
+
+
+## Verify a successor against a trusted checkpoint
+
+After enrolling a history and accepting its selection, keep that exact private
+enrollment and its digest separately from future handoffs. For the next signed
+selection, append these arguments to the existing version 2 `verify` command:
+
+```text
+--previous-enrollment /private/accepted-selection.json --expected-previous-sha256 ACCEPTED_PIN
+```
+
+Pass the new enrollment and its independent pin as usual. The new selection must
+have the same enrollment ID, the next selection revision and the exact prior
+digest. Its replayed history must extend the accepted history prefix under the
+same export, discovery and model. One selection revision can include several
+additional review entries. Success returns `previous_checkpoint_verified: true`
+alongside `ec2_history_selection_authenticated`. Replaying an already accepted
+selection is not an advance.
+
+Keep the prior file and pin under recipient control. The command does not update
+that checkpoint, arbitrate between signed successors, or establish global
+freshness. If the prior checkpoint and pin are rolled back together, this command
+cannot detect that rollback. Choose and retain a new checkpoint only after
+verification and your own acceptance decision.
