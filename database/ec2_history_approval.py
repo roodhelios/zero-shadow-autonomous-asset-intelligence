@@ -165,10 +165,16 @@ def approve_history(history, *, export_data, policy_data, expected_policy_sha256
 
 
 def verify_approval(history, approval_data, *, export_data, policy_data, expected_policy_sha256, audience, at,
-                    enrollment_data=None, expected_enrollment_sha256=None):
+                    enrollment_data=None, expected_enrollment_sha256=None,
+                    previous_enrollment_data=None, expected_previous_sha256=None):
     """Authenticate approval context, then reproduce every retained decision."""
     approval = _json(approval_data, 4096)
     selection = _selection_options(enrollment_data, expected_enrollment_sha256)
+    if previous_enrollment_data is not None or expected_previous_sha256 is not None:
+        if selection is None:
+            raise ValueError("checkpoint verification requires a selected enrollment")
+        selection.update(previous_enrollment_data=previous_enrollment_data,
+                         expected_previous_sha256=expected_previous_sha256)
     if selection is None:
         if set(approval) != FIELDS or approval.get("schema_version") != 1:
             raise ValueError("expected a history-only approval")
@@ -231,6 +237,8 @@ def main(argv=None):
             sub.add_argument("--output", type=Path, required=True)
         else:
             sub.add_argument("approval", type=Path)
+            sub.add_argument("--previous-enrollment", type=Path)
+            sub.add_argument("--expected-previous-sha256")
         sub.add_argument("--export", type=Path, required=True)
         sub.add_argument("--policy", type=Path, required=True)
         sub.add_argument("--expected-policy-sha256", required=True)
@@ -253,6 +261,11 @@ def main(argv=None):
             _publish(args.output, _canonical(approval)+"\n")
             result = {"schema_version": approval["schema_version"], "status": "ec2_history_approval_stored"}
         else:
+            if bool(args.previous_enrollment) != bool(args.expected_previous_sha256):
+                raise ValueError("previous enrollment and independent pin must be supplied together")
+            if args.previous_enrollment:
+                shared.update(previous_enrollment_data=read_enrollment(args.previous_enrollment),
+                              expected_previous_sha256=args.expected_previous_sha256)
             result = verify_approval(args.history, _file(args.approval, 4096), **shared)
     except (OSError, ValueError, TypeError, KeyError, sqlite3.DatabaseError, UnicodeError,
             RecursionError, OverflowError):

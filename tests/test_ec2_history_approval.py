@@ -227,6 +227,35 @@ class HistoryApprovalTests(unittest.TestCase):
         with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
             self.assertEqual(main(['verify', str(self.histories[0]), str(output), *common]), 2)
 
+    def test_signed_selection_uses_recipient_checkpoint_in_cli(self):
+        from database.ec2_history_enrollment import advance_enrollment, enroll_history
+        from database.ec2_review_history import verify_history
+
+        old = self.root/'old-enrollment'
+        new = self.root/'new-enrollment'
+        old_head = verify_history(self.histories[0], export_data=EXPORT)['head_sha256']
+        old_pin = enroll_history(self.histories[0], old, export_data=EXPORT,
+                                 expected_head=old_head)['enrollment_sha256']
+        new_head = verify_history(self.history, export_data=EXPORT)['head_sha256']
+        new_pin = advance_enrollment(self.history, new, export_data=EXPORT, expected_head=new_head,
+            enrollment_data=old.read_bytes(), expected_enrollment_sha256=old_pin)['enrollment_sha256']
+        policy = self.root/'policy'
+        policy.write_bytes(self.shared()['policy_data'])
+        signed = self.root/'approval'
+        signed.write_bytes(self.encoded(self.sign(enrollment_data=new.read_bytes(),
+                                                  expected_enrollment_sha256=new_pin)))
+        args = ['verify', str(self.history), str(signed), '--export', str(self.source),
+                '--policy', str(policy), '--expected-policy-sha256', self.shared()['expected_policy_sha256'],
+                '--audience', 'fixture-recipient', '--at', '2026-10-28T01:00:00Z',
+                '--enrollment', str(new), '--expected-enrollment-sha256', new_pin,
+                '--previous-enrollment', str(old), '--expected-previous-sha256']
+        with redirect_stdout(StringIO()) as stdout:
+            self.assertEqual(main([*args, old_pin]), 0)
+        self.assertTrue(json.loads(stdout.getvalue())['previous_checkpoint_verified'])
+        with redirect_stdout(StringIO()) as stdout, redirect_stderr(StringIO()):
+            self.assertEqual(main([*args, new_pin]), 2)
+        self.assertEqual(stdout.getvalue(), '')
+
     def test_demo(self):
         from engine.demo_ec2_approval import exercise
         result = exercise()

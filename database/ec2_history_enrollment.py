@@ -108,6 +108,14 @@ def advance_enrollment(history, output, *, enrollment_data, expected_enrollment_
                        export_data, expected_head):
     previous = _parse(enrollment_data, expected_enrollment_sha256)
     database, records, summary = _capture(history, export_data, expected_head)
+    candidate = _document(database, records, summary, export_data,
+        enrollment_id=previous['enrollment_id'], revision=previous['revision']+1,
+        previous=expected_enrollment_sha256)
+    _check_extension(records, candidate, previous)
+    return _publish_selection(candidate, output, 'ec2_history_enrollment_advanced')
+
+
+def _check_extension(records, candidate, previous):
     if len(records) <= previous['review_count']:
         raise ValueError('advance requires a strictly longer history')
     prefix_head = None
@@ -115,23 +123,31 @@ def advance_enrollment(history, output, *, enrollment_data, expected_enrollment_
     for sequence, record in enumerate(records[:previous['review_count']], 1):
         prefix_head = _head(sequence, prefix_head, _sha(_canonical(record)))
         prefix_decisions += len(_items(record))
-    candidate = _document(database, records, summary, export_data,
-        enrollment_id=previous['enrollment_id'], revision=previous['revision']+1,
-        previous=expected_enrollment_sha256)
     if (prefix_head != previous['head_sha256'] or prefix_decisions != previous['decision_count'] or
             any(candidate[key] != previous[key] for key in ('export_sha256', 'discovery_sha256', 'model_sha256'))):
         raise ValueError('new history is not an extension of the selected lineage')
-    return _publish_selection(candidate, output, 'ec2_history_enrollment_advanced')
 
 
-def verify_enrollment(history, *, enrollment_data, expected_enrollment_sha256, export_data):
+def verify_enrollment(history, *, enrollment_data, expected_enrollment_sha256, export_data,
+                      previous_enrollment_data=None, expected_previous_sha256=None):
     selected = _parse(enrollment_data, expected_enrollment_sha256)
+    previous = None
+    if previous_enrollment_data is not None or expected_previous_sha256 is not None:
+        previous = _parse(previous_enrollment_data, expected_previous_sha256)
+        if (selected['enrollment_id'] != previous['enrollment_id'] or
+                selected['revision'] != previous['revision'] + 1 or
+                selected['previous_enrollment_sha256'] != expected_previous_sha256):
+            raise ValueError('selection does not directly advance the trusted checkpoint')
     database, records, summary = _capture(history, export_data, selected['head_sha256'])
     candidate = _document(database, records, summary, export_data, enrollment_id=selected['enrollment_id'],
                          revision=selected['revision'], previous=selected['previous_enrollment_sha256'])
     if _bytes(candidate) != enrollment_data:
         raise ValueError('history differs from the independently selected revision')
-    return _receipt(selected, enrollment_data, 'ec2_history_enrollment_verified')
+    result = _receipt(selected, enrollment_data, 'ec2_history_enrollment_verified')
+    if previous is not None:
+        _check_extension(records, candidate, previous)
+        result['previous_checkpoint_verified'] = True
+    return result
 
 
 def read_enrollment(path):
