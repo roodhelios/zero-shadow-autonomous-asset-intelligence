@@ -170,3 +170,9 @@ that checkpoint, arbitrate between signed successors, or establish global
 freshness. If the prior checkpoint and pin are rolled back together, this command
 cannot detect that rollback. Choose and retain a new checkpoint only after
 verification and your own acceptance decision.
+
+The [recipient checkpoint command](ec2-recipient-checkpoint.md) now performs
+verification and local replacement under one advisory writer lock with an explicit
+accepted-digest check. Its temporary native exercise demonstrates signed bootstrap,
+successor acceptance, stale-writer rejection and rollback rejection. This does not
+distribute checkpoints or authenticate the operator's acceptance decision.
