@@ -199,6 +199,12 @@ An [Ed25519 selection approval](docs/ec2-history-enrollment.md#authenticate-the-
 can bind the exact enrollment under a pinned authority policy. A recipient can also
 [verify its successor](docs/ec2-history-enrollment.md#verify-a-successor-against-a-trusted-checkpoint)
 against a separately retained checkpoint.
+To persist that acceptance with stale-writer checks, run
+`python -m engine.demo_ec2_recipient` after installing `requirements-review.txt`.
+Expect `ec2_recipient_exercise_passed`, accepted revision 2 and two rejected
+negative cases. The [recipient acceptance guide](docs/ec2-recipient-checkpoint.md)
+shows the local command, private writer lock and interrupted-response recovery
+limits. This optional native Ed25519 exercise uses temporary synthetic data only.
 The [enrollment guide](docs/ec2-history-enrollment.md) gives retained commands and
 limits. This standard-library exercise uses synthetic data and native temporary
 SQLite. Local selection does not establish reviewer identity, journal ownership
