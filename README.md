@@ -205,6 +205,12 @@ Expect `ec2_recipient_exercise_passed`, accepted revision 2 and two rejected
 negative cases. The [recipient acceptance guide](docs/ec2-recipient-checkpoint.md)
 shows the local command, private writer lock and interrupted-response recovery
 limits. This optional native Ed25519 exercise uses temporary synthetic data only.
+To also check a separately enrolled operator's consent, run
+`python -m engine.demo_ec2_operator` with the same optional dependency. Expect
+`ec2_operator_exercise_passed`, accepted revision 2, two key roles and five rejected
+negative cases. The [operator acceptance guide](docs/ec2-operator-acceptance.md)
+shows signing and acceptance commands. This is opt-in enrolled-key authorization,
+not proof of human review; the original unsigned-operator local path remains available.
 The [enrollment guide](docs/ec2-history-enrollment.md) gives retained commands and
 limits. This standard-library exercise uses synthetic data and native temporary
 SQLite. Local selection does not establish reviewer identity, journal ownership

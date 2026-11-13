@@ -102,5 +102,8 @@ acceptance decision, arbitrate global forks, synchronize remote recipients or pr
 rollback of both the local file and its separately trusted pin. It cannot discover a
 newer selection. Keep `latest_head_established: false` in downstream interpretations.
 
-Next: define authenticated operator acceptance and recovery evidence before using
-this checkpoint to authorize actions or synchronize recipients.
+An [opt-in signed operator workflow](ec2-operator-acceptance.md) now binds a separate
+enrolled key's consent to the candidate, predecessor, recipient and trust policies
+before this locked acceptance step. The original local command still works without
+that consent. Independent recovery evidence and trusted operator enrollment remain
+unfinished before using this checkpoint to authorize actions or synchronize recipients.

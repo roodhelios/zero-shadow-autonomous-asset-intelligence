@@ -66,14 +66,14 @@ def _json(data, limit):
     return value
 
 
-def _policy(data, pin, audience, key_id, at, *, signing=False):
+def _policy(data, pin, audience, key_id, at, *, signing=False, purpose=PURPOSE):
     _check_digest(pin)
     if not isinstance(data, bytes) or len(data) > 64 * 1024 or hashlib.sha256(data).hexdigest() != pin:
         raise ValueError("authority policy does not match the required pin")
     policy = _json(data, 64 * 1024)
     if (set(policy) != {"schema_version", "purpose", "audience", "max_validity_seconds", "keys"} or
             type(policy["schema_version"]) is not int or policy["schema_version"] != 1 or
-            policy["purpose"] != PURPOSE or policy["audience"] != _identifier(audience)):
+            policy["purpose"] != purpose or policy["audience"] != _identifier(audience)):
         raise ValueError("unsupported authority policy or recipient")
     maximum = policy["max_validity_seconds"]
     keys = policy["keys"]
