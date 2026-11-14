@@ -25,7 +25,7 @@ and assessment dates are fixture claims, not measurements taken during the exerc
 
 ## Back up your retained assessment
 
-First complete the [assessment retention quickstart](../README.md#retain-a-reviewed-inventory-assessment).
+First complete the [assessment retention quickstart](local-workflows.md#retain-a-reviewed-inventory-assessment).
 Move its closed output into an owned 0700 source directory outside Git, preserving
 0600 file permissions. Use new, separately selected private backup and restore
 directories. The following placeholders name your own local paths:

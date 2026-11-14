@@ -42,7 +42,7 @@ latest selection or prevent a receiver from choosing a stale record.
 ## Enroll a selected closed history
 
 First reproduce the history against its original export using the
-[history workflow](../README.md#retain-an-ordered-ec2-review-history). Review the
+[history workflow](local-workflows.md#retain-an-ordered-ec2-review-history). Review the
 head digest deliberately. Put the files in owned mode-0700 storage with trusted
 ancestors, and select a fresh output path. Replace uppercase placeholders with
 independently selected lowercase 64-character SHA-256 digests:
@@ -132,7 +132,7 @@ on both `sign` and `verify`:
 ```
 
 Use the history, export, policy, audience, clock, and seed setup from the
-[history approval workflow](../README.md#independently-verify-an-ec2-history-approval).
+[history approval workflow](local-workflows.md#independently-verify-an-ec2-history-approval).
 Use the selection pin obtained independently from the file being checked.
 Signing first verifies the exact enrollment against the retained SQLite bytes
 and original export. Verification requires the same enrollment and pin, the

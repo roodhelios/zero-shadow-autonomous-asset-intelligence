@@ -76,7 +76,7 @@ Airflow deployment, full disks, device failure and PostgreSQL are not validated 
 The check does not authenticate asset sources, make SQLite append-only against a
 database owner, or change the existing inventory/assessment contracts.
 
-Run the [retained inventory exercise](../README.md#try-the-complete-retained-inventory-exercise)
+Run the [retained inventory exercise](local-workflows.md#try-the-complete-retained-inventory-exercise)
 after storage checks to test the application path. Preserve frozen model source files
 with retained assessments. The [closed-assessment backup/restore workflow](assessment-backup.md)
 now exercises restoration after removing the original databases, using independently
