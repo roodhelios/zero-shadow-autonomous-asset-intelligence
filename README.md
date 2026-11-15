@@ -54,6 +54,7 @@ commands still work. `demo` accepts only the listed names and no external input 
 | Goal | Temporary exercise | Retained-file instructions |
 | --- | --- | --- |
 | Retain and reproduce an osquery assessment | `demo inventory` | [Inventory and assessment commands](docs/local-workflows.md#retain-a-reviewed-inventory-assessment) |
+| Export later-date queues directly from a retained assessment | `demo inventory` | [Verified dated queues](docs/assessment-queues.md) |
 | Restore an assessment with its replay inputs | `demo assessment-archive` | [Assessment archive](docs/assessment-archive.md) |
 | Compare saved EC2 batches | `demo ec2-compare` | [Discovery comparison](docs/ec2-discovery-comparison.md) |
 | Review expected and missing EC2 batches | `demo ec2-checkpoint` | [Sequence checkpoint](docs/ec2-sequence-checkpoint.md) |
