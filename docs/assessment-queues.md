@@ -66,3 +66,40 @@ is unsigned and contains sensitive finding/queue data.
 Validation uses deterministic native SQLite fixtures, changed decisions and exports,
 pin/date/model failures, read-only originals, capture-time path replacement and
 exclusive private CLI output. Prepared with assistant support.
+
+## Reproduce a received report
+
+The sender's output digest is useful only if retained through an independently
+trusted channel. A recipient also needs the closed assessment database, original
+osquery export, independent database digest and intended review date. Do not copy
+these requirements from an untrusted report just to make it match.
+
+```bash
+python -m database.inventory_assessment_queue_verify \
+  /private/review/new-queues.json /private/review/assessed.sqlite \
+  --export /private/review/original-osquery.json \
+  --expected-report-sha256 TRUSTED_REPORT_SHA256 \
+  --expected-database-sha256 TRUSTED_ASSESSMENT_SHA256 --as-of 2026-11-15
+```
+
+Expect `assessment_queue_reproduced`, counts, date and the checked digests. No
+finding IDs, descriptions, team labels or local paths are printed. The command
+reads only and returns 2 with fixed diagnostics on failure. It accepts reports up
+to 32 MiB. Reports larger than this receiver limit need a separately designed
+workflow; the existing exporter is unchanged.
+
+The report digest and size are checked before JSON parsing or SQLite replay.
+Duplicate fields, non-finite numbers and non-object reports reject. The receiver
+then regenerates the entire report under the independently supplied database pin
+and date, including full retained-assessment verification. It compares all fields,
+not just counts or a self-reported checksum. Edited priorities, finding details,
+coverage, policy digests, unknown fields and integer/boolean/float substitutions
+therefore reject even if an edited report is supplied with a new report pin.
+Whitespace differences can reproduce only under the corresponding independent
+exact-byte report pin. A different intended date requires a fresh report.
+
+The inventory demo now also reports `recipient_queue_status: assessment_queue_reproduced`.
+No signature or human authorization is added. An attacker controlling the source
+assessment, export and trusted settings together can create a consistent replacement.
+The receiver proves current-model consistency, not source truth, pin freshness,
+accepted ownership or remediation. Keep private inputs outside Git.

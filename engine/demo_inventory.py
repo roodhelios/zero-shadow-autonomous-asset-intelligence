@@ -12,6 +12,7 @@ from database.inventory_cli import store_export
 from database.inventory_assessment_cli import retain_assessment
 from database.inventory_assessment_verify import verify_assessment
 from database.inventory_assessment_queue import build_queues
+from database.inventory_assessment_queue_verify import verify_queues
 
 EXAMPLES = Path(__file__).resolve().parents[1] / "examples"
 
@@ -46,6 +47,10 @@ def exercise():
             raise ValueError('retained finding did not become overdue in the later review')
         if assessed.read_bytes() != before:
             raise ValueError('dated queue planning changed the retained assessment')
+        queue_data = json.dumps(queued, sort_keys=True).encode()
+        received = verify_queues(queue_data, assessed, export.read_bytes(),
+            expected_report_sha256=hashlib.sha256(queue_data).hexdigest(),
+            expected_database_sha256=hashlib.sha256(before).hexdigest(), as_of=date(2026, 11, 15))
         try:
             verify_assessment(assessed, export.read_bytes() + b"\n", require_model_binding=True)
         except ValueError:
@@ -58,6 +63,7 @@ def exercise():
             "assessment_status": verified["status"], "changed_export": "rejected",
             "dated_queue_assigned_items": queued['queue_document']['queues']['assigned_item_count'],
             "dated_queue_changed_items": comparison['changed_item_count'],
+            "recipient_queue_status": received['status'],
             "interpretation": "Fixed fixture dates and supplied finding/ownership claims. "
             "Local replay does not establish live discovery, accepted ownership or remediation."}
 
