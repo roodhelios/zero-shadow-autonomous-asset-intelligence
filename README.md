@@ -51,6 +51,18 @@ The catalog lists all 15 bundled temporary exercises and their dependencies. Hel
 and listing do not load optional signing packages. Existing `python -m engine.demo_*`
 commands still work. `demo` accepts only the listed names and no external input paths.
 
+To retain your own reviewed files rather than run a temporary exercise:
+
+```bash
+python -m engine inventory
+python -m engine inventory import --help
+```
+
+The inventory command lists import, export, assessment, verification and dated queue
+tools. Follow the [retained inventory quickstart](docs/inventory-commands.md) for a
+complete fixture run that leaves private evidence available for review. Each tool
+keeps its original scope, input, date, pin and new-output requirements.
+
 | Goal | Temporary exercise | Retained-file instructions |
 | --- | --- | --- |
 | Retain and reproduce an osquery assessment | `demo inventory` | [Inventory and assessment commands](docs/local-workflows.md#retain-a-reviewed-inventory-assessment) |

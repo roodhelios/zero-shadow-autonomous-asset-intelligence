@@ -4,6 +4,10 @@ Run commands from the repository root. Start with the [quickstart](../README.md)
 or `python -m engine list` to choose a temporary exercise. This reference preserves
 the detailed retained-file commands and their trust boundaries.
 
+For the osquery path, [the retained inventory quickstart](inventory-commands.md)
+connects these tools through `python -m engine inventory`. Existing module commands
+below remain available and retain the same behavior.
+
 ## Try the complete retained-inventory exercise
 
 On POSIX with Python 3.11 or newer, use only the standard library:
