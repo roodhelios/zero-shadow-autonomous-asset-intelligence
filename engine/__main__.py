@@ -27,16 +27,22 @@ WORKFLOWS = (
 
 
 def main(argv=None):
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    # Retained-file tools own their argument parsers, including --help.
+    if arguments and arguments[0] == "inventory":
+        from .inventory_cli import main as inventory_main
+        return inventory_main(arguments[1:])
     parser = argparse.ArgumentParser(description=(
-        "Zero Shadow local exercises. Python 3.11+ on POSIX. Bundled synthetic "
-        "inputs, temporary files, no network or remediation actions. "
+        "Zero Shadow local exercises and retained inventory tools. Python 3.11+ on POSIX. "
+        "Demos use bundled synthetic inputs and temporary files. No network or remediation actions. "
         "Retained-file commands: docs/local-workflows.md."))
     commands = parser.add_subparsers(dest="command", required=True)
     catalog = commands.add_parser("list", help="show exercises and dependency requirements")
     catalog.add_argument("--format", choices=("text", "json"), default="text")
     demo = commands.add_parser("demo", help="run one temporary synthetic exercise")
     demo.add_argument("workflow", choices=[item[0] for item in WORKFLOWS])
-    args = parser.parse_args(argv)
+    commands.add_parser("inventory", help="retain and reproduce saved osquery inventory")
+    args = parser.parse_args(arguments)
     if args.command == "list":
         if args.format == "json":
             print(json.dumps({"schema_version": 1, "workflows": [
