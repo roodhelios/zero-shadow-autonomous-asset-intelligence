@@ -15,11 +15,36 @@ accepted ownership. A public-address field is not an effective-exposure assessme
 The input is a saved JSON object in the AWS
 [describe-instances output format](https://docs.aws.amazon.com/cli/latest/reference/ec2/describe-instances.html).
 The importer reads `Reservations`, checks each `OwnerId` against the explicit
-account, and projects each instance's ID, primary private/public IPv4 fields and
+account, and projects each instance's ID, primary private/public IPv4 fields,
+instance `Ipv6Address`, `NetworkInterfaces[].Ipv6Addresses[].Ipv6Address`, and
 only the exact tag keys `environment`, `owner_group` and `service`. It preserves
 the original byte digest and one-based reservation/instance references. DNS names,
-instance state, other addresses and unselected metadata are not copied or inferred.
+instance state, secondary IPv4 addresses and unselected metadata are not copied or inferred.
 The fixture intentionally says `stopped`; inclusion never means running or reachable.
+
+IPv6 literals are canonicalized and deduplicated across the instance and its
+interfaces. A present malformed IPv6 field rejects the whole import. Missing or
+empty interface/address lists remain valid. Scoped addresses, prefixes and IPv4
+strings are not IPv6 literals. Interface metadata such as `IsPrimaryIpv6` does not
+change identity or risk. Delegated `Ipv6Prefixes` are not individual host addresses.
+The selected field shapes follow the AWS CLI output reference linked above.
+Local review bounds are 100 interfaces per instance and 100 IPv6 records per
+interface, within the existing 4 MiB input bound. These are importer limits, not
+claims about AWS account quotas or complete network coverage.
+
+For a runnable dual-stack example, replace the input above with
+`examples/ec2-ipv6.json`. Expect the same one asset and four selected addresses:
+`192.0.2.40`, `198.51.100.40`, `2001:db8::40`, `2001:db8::41`. The primary IPv6
+appears twice in the input but once in the projection. The delegated prefix is
+omitted. The same file works with the retained SQLite commands below. No address
+is contacted, and an IPv6 address does not establish effective public exposure.
+
+This changes the projection for exports containing those IPv6 fields. A retained
+inventory created by the older IPv4-only importer will not reproduce against the
+new projection for such an export. Existing assessment receipts also bind exact
+model source files, including this importer. Preserve their matching checkout;
+historical model dispatch and migration are not implemented. Create new evidence
+at a new path rather than modifying or relabeling an old receipt.
 
 Without `--format inventory`, the output uses the existing fixture contract and can
 feed the evidence workflow. A native SQLite regression test runs that complete path
