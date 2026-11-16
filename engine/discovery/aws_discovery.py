@@ -16,7 +16,36 @@ from engine.models import AssetObservation
 
 SOURCE = "aws-ec2-export"
 MAX_INSTANCES = 10000
+MAX_NETWORK_INTERFACES = 100
+MAX_IPV6_PER_INTERFACE = 100
 REVIEW_TAGS = {"environment", "owner_group", "service"}
+
+
+def _ipv6_addresses(instance):
+    """Project individual saved IPv6 claims, never delegated prefixes or exposure."""
+    addresses = set()
+
+    def add(value):
+        if not isinstance(value, str) or "%" in value:
+            raise ValueError("expected an unscoped literal IPv6 address")
+        addresses.add(str(ipaddress.IPv6Address(value)))
+
+    if "Ipv6Address" in instance:
+        add(instance["Ipv6Address"])
+    interfaces = instance.get("NetworkInterfaces", [])
+    if not isinstance(interfaces, list) or len(interfaces) > MAX_NETWORK_INTERFACES:
+        raise ValueError("expected at most 100 network interfaces")
+    for interface in interfaces:
+        if not isinstance(interface, dict):
+            raise ValueError("expected a network interface object")
+        values = interface.get("Ipv6Addresses", [])
+        if not isinstance(values, list) or len(values) > MAX_IPV6_PER_INTERFACE:
+            raise ValueError("expected at most 100 IPv6 records per interface")
+        for record in values:
+            if not isinstance(record, dict) or "Ipv6Address" not in record:
+                raise ValueError("expected an IPv6 address record")
+            add(record["Ipv6Address"])
+    return addresses
 
 
 def convert_export(data, *, scope, account, region):
@@ -54,7 +83,7 @@ def convert_export(data, *, scope, account, region):
             if arn in seen:
                 raise ValueError("duplicate instance in supplied account and region")
             seen.add(arn)
-            addresses = set()
+            addresses = _ipv6_addresses(instance)
             for field in ("PrivateIpAddress", "PublicIpAddress"):
                 value = instance.get(field)
                 if value is None:

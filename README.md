@@ -92,7 +92,7 @@ cooperative writers and the private POSIX filesystem conditions documented there
 
 | Area | Current behavior |
 | --- | --- |
-| Discovery and correlation | Saved local osquery/EC2 imports and scoped fixtures. Strong identifiers merge; IP alone does not. |
+| Discovery and correlation | Saved local osquery/EC2 imports (including selected IPv6 fields) and scoped fixtures. Strong identifiers merge; IP alone does not. |
 | Decisions | Explainable scoring, tag-based ownership, P0 to P3 planning and explicit unassigned outcomes. Supplied claims are not independently verified. |
 | Evidence | Local SQLite retention, same-model replay, comparison, closed-file backup/archive and pinned checkpoints. Optional enrolled-key approvals and operator consent. |
 | Unfinished | Live discovery, historical model dispatch, live database backup, deployed Airflow persistence and independently distributed latest checkpoints. Some connector/infrastructure files remain placeholders. |
