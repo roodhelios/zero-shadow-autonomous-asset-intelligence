@@ -66,9 +66,9 @@ claims unchanged. JSON formatting and later observation times alone also do not
 count as an asset change. Identity uses the existing strong EC2 account/region/instance
 keys; a shared address never merges instances.
 
-The current importer projects instance identity, literal address sets and only the
+The current importer projects instance identity, selected instance/interface literal address sets and only the
 `environment`, `owner_group` and `service` tags. It omits EC2 state, DNS names, other
-tags, interfaces, security groups and many other fields. Private/public address roles
+tags, interface identity/roles, security groups and many other fields. Private/public address roles
 are not preserved in that combined address set. Changes to unselected fields are
 not reported as asset changes. Do not interpret an unchanged projection as an
 unchanged complete instance, unchanged exposure or an accepted owner assignment.
@@ -78,6 +78,66 @@ or complete collection. Changed ownership tags are supplied metadata, not human 
 acceptance. No risk finding, priority, due date or remediation action is inferred.
 The new comparator does not alter existing osquery inventory comparison or same-batch
 EC2 assessment comparison/history formats.
+
+## Review interface address differences
+
+```bash
+python -S -m engine demo ec2-addresses
+```
+
+This no-install exercise imports two generated synthetic exports into native SQLite,
+reproduces both against their original bytes, and retains a temporary private comparison.
+The fixture changes a secondary private IPv4 claim, its associated public IPv4 claim,
+and one IPv6 claim. It adds a second identity sharing an address to check that the
+comparison does not merge instances by IP. No AWS endpoint or credential is used.
+
+Expected selected output:
+
+```json
+{
+  "status": "ec2_address_review_exercise_passed",
+  "shared_identities_with_address_changes": 1,
+  "added_address_claims": 3,
+  "not_observed_address_claims": 3,
+  "retained_address_claims": 3,
+  "separate_added_identities": 1,
+  "changed_original": "rejected",
+  "inputs_unchanged": true
+}
+```
+
+For retained evidence, use the existing comparison command above. Every entry in
+`changes` now includes an `address_claims` object alongside the complete previous
+and current records and their source references. In this fixture it contains:
+
+```json
+{
+  "added": ["192.0.2.42", "198.51.100.42", "2001:db8::42"],
+  "not_observed": ["192.0.2.41", "198.51.100.41", "2001:db8::41"],
+  "retained": ["192.0.2.40", "198.51.100.40", "2001:db8::40"]
+}
+```
+
+These sorted, normalized sets compare only the selected claims of the same strong
+EC2 identity. Added and unobserved identities stay in their existing report sections;
+their addresses are not assigned to another identity's differences. A tag-only change
+has empty added/not-observed address lists and lists all retained addresses. Equal
+projected claims remain in `unchanged_asset_ids`, with no change entry. Duplicate
+paths, equivalent IPv6 spelling or reordered address records do not create changes.
+
+An address no longer observed in one supplied file is not a removed interface,
+revoked public association, unreachable service or reduction in exposure. The selected
+combined address set discards public/private roles, interface identity and primary flags.
+Role-only changes are invisible. Missing collection coverage remains unverified; both
+files can be incomplete even when their local reproduction passes. The private report
+contains addresses and identifiers; stdout still prints only the original aggregate
+counts and source-check flags. This additive report field does not change the existing
+discovery database or assessment schemas.
+
+The comparator's source is included in exact-source EC2 sequence archives. Updating
+this file changes that archive source fingerprint even though the timeline algorithm
+is unchanged. Old archives require their matching trusted checkout; no historical
+model dispatch or migration is added. Keep original files and the source revision.
 
 ## Evidence and storage limits
 
