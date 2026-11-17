@@ -19,7 +19,7 @@ account, and projects each instance's ID, primary private/public IPv4 fields,
 instance `Ipv6Address`, `NetworkInterfaces[].Ipv6Addresses[].Ipv6Address`, and
 only the exact tag keys `environment`, `owner_group` and `service`. It preserves
 the original byte digest and one-based reservation/instance references. DNS names,
-instance state, secondary IPv4 addresses and unselected metadata are not copied or inferred.
+instance state and unselected metadata are not copied or inferred.
 The fixture intentionally says `stopped`; inclusion never means running or reachable.
 
 IPv6 literals are canonicalized and deduplicated across the instance and its
@@ -45,6 +45,39 @@ new projection for such an export. Existing assessment receipts also bind exact
 model source files, including this importer. Preserve their matching checkout;
 historical model dispatch and migration are not implemented. Create new evidence
 at a new path rather than modifying or relabeling an old receipt.
+
+## Include saved interface IPv4 claims
+
+The importer also selects `NetworkInterfaces[].PrivateIpAddress`, its
+`Association.PublicIp`, and every `PrivateIpAddresses[]` record's private address
+and optional `Association.PublicIp`. These shapes follow the primary AWS CLI
+output reference linked above. Repeated primary/secondary addresses collapse
+into one literal address per asset. DNS names, primary flags, allocation IDs and
+association metadata are omitted. The ARN remains the identity: shared private
+or public addresses never merge distinct instances and do not establish exposure.
+
+```bash
+python -m engine.discovery.aws_discovery examples/ec2-interface-addresses.json \
+  --scope synthetic --account 111122223333 --region us-east-1 --format inventory
+```
+
+Expect one observation, one asset and six addresses: `192.0.2.40`, `192.0.2.41`,
+`198.51.100.40`, `198.51.100.41`, `2001:db8::40`, `2001:db8::41`. This same
+fixture works with the native retained SQLite store/verify/export commands below.
+No AWS call, network scan or credential is needed.
+
+Missing/empty private-address arrays and an empty association object are valid.
+Present malformed collections, missing required private literals, non-IPv4 values
+and malformed association objects reject the complete import before publication.
+The local bound is 100 private-address records per interface within the existing
+100-interface and 4 MiB limits, not an AWS quota claim. Delegated IPv4 prefixes and
+the separate `SecondaryInterfaces` structure are not projected.
+
+This extends the projection for exports whose interface IPv4 claims were omitted
+by an older importer. Such retained inventories need the matching old checkout to
+reproduce. Exact-source assessment receipts also change model identity. Preserve
+old evidence and create new output paths; no migration or historical dispatch is
+implemented. Prepared with assistant support and local synthetic tests.
 
 Without `--format inventory`, the output uses the existing fixture contract and can
 feed the evidence workflow. A native SQLite regression test runs that complete path

@@ -18,6 +18,7 @@ SOURCE = "aws-ec2-export"
 MAX_INSTANCES = 10000
 MAX_NETWORK_INTERFACES = 100
 MAX_IPV6_PER_INTERFACE = 100
+MAX_IPV4_PER_INTERFACE = 100
 REVIEW_TAGS = {"environment", "owner_group", "service"}
 
 
@@ -45,6 +46,42 @@ def _ipv6_addresses(instance):
             if not isinstance(record, dict) or "Ipv6Address" not in record:
                 raise ValueError("expected an IPv6 address record")
             add(record["Ipv6Address"])
+    return addresses
+
+
+def _ipv4_addresses(instance):
+    """Select saved primary and interface IPv4 claims without exposure inference."""
+    addresses = set()
+
+    def add(value):
+        if not isinstance(value, str) or "%" in value:
+            raise ValueError("expected a literal IPv4 address")
+        addresses.add(str(ipaddress.IPv4Address(value)))
+
+    def association(record):
+        if "Association" in record:
+            value = record["Association"]
+            if not isinstance(value, dict):
+                raise ValueError("expected an IPv4 association object")
+            if "PublicIp" in value:
+                add(value["PublicIp"])
+
+    for field in ("PrivateIpAddress", "PublicIpAddress"):
+        if instance.get(field) is not None:
+            add(instance[field])
+    # The IPv6 projection already checks interface object and collection bounds.
+    for interface in instance.get("NetworkInterfaces", []):
+        if "PrivateIpAddress" in interface:
+            add(interface["PrivateIpAddress"])
+        association(interface)
+        records = interface.get("PrivateIpAddresses", [])
+        if not isinstance(records, list) or len(records) > MAX_IPV4_PER_INTERFACE:
+            raise ValueError("expected at most 100 IPv4 records per interface")
+        for record in records:
+            if not isinstance(record, dict) or "PrivateIpAddress" not in record:
+                raise ValueError("expected a private IPv4 record")
+            add(record["PrivateIpAddress"])
+            association(record)
     return addresses
 
 
@@ -84,13 +121,7 @@ def convert_export(data, *, scope, account, region):
                 raise ValueError("duplicate instance in supplied account and region")
             seen.add(arn)
             addresses = _ipv6_addresses(instance)
-            for field in ("PrivateIpAddress", "PublicIpAddress"):
-                value = instance.get(field)
-                if value is None:
-                    continue
-                if not isinstance(value, str) or "%" in value:
-                    raise ValueError("expected a literal IPv4 address")
-                addresses.add(str(ipaddress.IPv4Address(value)))
+            addresses.update(_ipv4_addresses(instance))
             raw_tags = instance.get("Tags", [])
             if not isinstance(raw_tags, list) or len(raw_tags) > 100:
                 raise ValueError("expected at most 100 tag records")
