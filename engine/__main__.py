@@ -12,6 +12,7 @@ WORKFLOWS = (
     ("assessment-backup", "demo_assessment_backup", "standard-library", "Restore an exact closed assessment backup"),
     ("assessment-archive", "demo_assessment_archive", "standard-library", "Restore an assessment with retained replay inputs"),
     ("ec2-compare", "demo_ec2_discovery_compare", "standard-library", "Compare two saved EC2 discovery batches"),
+    ("ec2-addresses", "demo_ec2_addresses", "standard-library", "Explain changed interface address claims between saved EC2 batches"),
     ("ec2-timeline", "demo_ec2_timeline", "standard-library", "Review a sequence of saved EC2 observations"),
     ("ec2-checkpoint", "demo_ec2_checkpoint", "standard-library", "Check expected and supplied EC2 batches"),
     ("ec2-archive", "demo_ec2_archive", "standard-library", "Restore a saved EC2 sequence and its inputs"),

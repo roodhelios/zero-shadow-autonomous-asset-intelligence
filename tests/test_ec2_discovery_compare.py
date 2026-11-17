@@ -17,6 +17,7 @@ from database.ec2_inventory import store_ec2
 from database.ec2_inventory_compare import compare_inventories, export_comparison, main
 from database.inventory_assessment_verify import _snapshot
 from engine.demo_ec2_discovery_compare import exports
+from engine.demo_ec2_addresses import exports as address_exports
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -43,6 +44,8 @@ class EC2DiscoveryComparisonTests(unittest.TestCase):
         self.assertEqual(result['counts'],dict(previous_assets=2,current_assets=2,added=1,not_observed=1,changed=1,unchanged=0))
         changed=result['changes'][0]
         self.assertEqual(changed['changed_fields'],['ip_addresses','tags'])
+        self.assertEqual(changed['address_claims'], {'added': [], 'not_observed': ['198.51.100.40'],
+                                                   'retained': ['192.0.2.40']})
         self.assertEqual(changed['previous']['source_reference']['instance_record'],1)
         self.assertEqual(changed['current']['source_reference']['instance_record'],2)
         self.assertEqual(changed['previous']['asset_id'],changed['current']['asset_id'])
@@ -145,6 +148,104 @@ class EC2DiscoveryComparisonTests(unittest.TestCase):
         self.assertEqual(run.returncode,0,run.stderr);result=json.loads(run.stdout)
         self.assertEqual(result['status'],'ec2_discovery_comparison_exercise_passed')
         self.assertEqual((result['added'],result['not_observed'],result['changed']),(1,1,1))
+        self.assertTrue(result['inputs_unchanged'])
+
+    def test_interface_ipv4_and_ipv6_claims_have_exact_differences(self):
+        before, after = address_exports()
+        previous = self.store('addresses-before', before, 24)
+        current = self.store('addresses-after', after, 25)
+        with patch('socket.socket', side_effect=AssertionError('network forbidden')):
+            result = compare_inventories(previous, current, previous_export=before, current_export=after)
+        change = result['changes'][0]
+        self.assertEqual(change['address_claims'], {
+            'added': ['192.0.2.42', '198.51.100.42', '2001:db8::42'],
+            'not_observed': ['192.0.2.41', '198.51.100.41', '2001:db8::41'],
+            'retained': ['192.0.2.40', '198.51.100.40', '2001:db8::40']})
+        self.assertEqual(result['counts'], dict(previous_assets=1, current_assets=2,
+            added=1, not_observed=0, changed=1, unchanged=0))
+        self.assertNotEqual(result['added'][0]['asset_id'], change['asset_id'])
+        self.assertEqual(change['previous']['source_reference']['instance_record'], 1)
+        self.assertEqual(change['current']['source_reference']['instance_record'], 1)
+
+    def test_empty_address_sets_support_both_directions(self):
+        before = json.loads(address_exports()[0])
+        empty = json.loads(json.dumps(before))
+        instance = empty['Reservations'][0]['Instances'][0]
+        for field in ('PrivateIpAddress', 'PublicIpAddress', 'Ipv6Address', 'NetworkInterfaces'):
+            instance.pop(field)
+        full_bytes, empty_bytes = json.dumps(before).encode(), json.dumps(empty).encode()
+        for index, (left, right) in enumerate(((full_bytes, empty_bytes), (empty_bytes, full_bytes))):
+            with self.subTest(direction=index):
+                previous = self.store('empty-before'+str(index), left, 24)
+                current = self.store('empty-after'+str(index), right, 25)
+                claims = compare_inventories(previous, current, previous_export=left,
+                                             current_export=right)['changes'][0]['address_claims']
+                self.assertEqual(claims['retained'], [])
+                self.assertEqual(len(claims['not_observed' if index == 0 else 'added']), 6)
+                self.assertEqual(claims['added' if index == 0 else 'not_observed'], [])
+
+    def test_roles_formatting_and_duplicates_do_not_invent_address_changes(self):
+        before = address_exports()[0]
+        after = json.loads(before)
+        instance = after['Reservations'][0]['Instances'][0]
+        # The combined set is preserved despite dropping duplicate paths and role claims.
+        for field in ('PrivateIpAddress', 'PublicIpAddress', 'Ipv6Address'):
+            instance.pop(field)
+        interface = instance['NetworkInterfaces'][0]
+        interface['Ipv6Addresses'].reverse()
+        interface['Ipv6Addresses'][0]['Ipv6Address'] = '2001:0db8:0:0:0:0:0:0041'
+        interface['PrivateIpAddresses'].reverse()
+        interface['PrivateIpAddresses'][0]['Primary'] = True
+        interface['PrivateIpAddresses'][1]['Primary'] = False
+        interface['PrivateIpAddresses'].append({'PrivateIpAddress': '192.0.2.40'})
+        after = json.dumps(after, indent=4).encode()
+        previous, current = self.store('roles-before', before, 24), self.store('roles-after', after, 25)
+        result = compare_inventories(previous, current, previous_export=before, current_export=after)
+        self.assertEqual(result['changes'], [])
+        self.assertEqual(result['counts']['unchanged'], 1)
+        self.assertTrue(result['source_bytes_changed'])
+
+    def test_tag_only_change_retains_all_address_claims(self):
+        data = json.loads(self.before)
+        data['Reservations'][0]['Instances'][0]['Tags'][1]['Value'] = 'application-security'
+        raw = json.dumps(data).encode()
+        current = self.store('tag-only', raw, 25)
+        result = compare_inventories(self.old, current, previous_export=self.before, current_export=raw)
+        self.assertEqual(result['changes'][0]['changed_fields'], ['tags'])
+        self.assertEqual(result['changes'][0]['address_claims'], {
+            'added': [], 'not_observed': [], 'retained': ['192.0.2.40', '198.51.100.40']})
+
+    def test_retained_cli_has_differences_but_stdout_has_no_address_claims(self):
+        before, after = address_exports()
+        previous, current = self.store('cli-before', before, 24), self.store('cli-after', after, 25)
+        originals = [p.read_bytes() for p in (previous, current, self.root/'cli-before.json', self.root/'cli-after.json')]
+        output = self.root/'address-review.json'
+        args = [str(previous), str(current), '--previous-export', str(self.root/'cli-before.json'),
+                '--current-export', str(self.root/'cli-after.json'), '--output', str(output)]
+        stdout = StringIO()
+        with patch('socket.socket', side_effect=AssertionError('network forbidden')), redirect_stdout(stdout):
+            self.assertEqual(main(args), 0)
+        report = json.loads(output.read_bytes())
+        self.assertEqual(len(report['changes'][0]['address_claims']['added']), 3)
+        self.assertEqual(output.stat().st_mode & 0o777, 0o600)
+        for value in ('192.0.2.42', '2001:db8::42', '111122223333', str(self.root), 'address_claims'):
+            self.assertNotIn(value, stdout.getvalue())
+        self.assertEqual(originals, [p.read_bytes() for p in
+            (previous, current, self.root/'cli-before.json', self.root/'cli-after.json')])
+        saved = output.read_bytes()
+        with redirect_stderr(StringIO()):
+            self.assertEqual(main(args), 2)
+        self.assertEqual(output.read_bytes(), saved)
+
+    def test_address_demo_through_public_dispatch_without_site_packages(self):
+        run = subprocess.run([sys.executable, '-S', '-m', 'engine', 'demo', 'ec2-addresses'],
+                             cwd=ROOT, capture_output=True, text=True, timeout=30)
+        self.assertEqual(run.returncode, 0, run.stderr)
+        result = json.loads(run.stdout)
+        self.assertEqual(result['status'], 'ec2_address_review_exercise_passed')
+        self.assertEqual((result['added_address_claims'], result['not_observed_address_claims'],
+                          result['retained_address_claims'], result['separate_added_identities']), (3, 3, 3, 1))
+        self.assertEqual(result['changed_original'], 'rejected')
         self.assertTrue(result['inputs_unchanged'])
 
 

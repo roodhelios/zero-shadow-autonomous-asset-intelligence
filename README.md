@@ -45,9 +45,10 @@ completed remediation. A nonzero exit means the exercise did not complete.
 python -m engine list
 python -m engine list --format json
 python -m engine demo ec2-compare
+python -m engine demo ec2-addresses
 ```
 
-The catalog lists all 15 bundled temporary exercises and their dependencies. Help
+The catalog lists all 16 bundled temporary exercises and their dependencies. Help
 and listing do not load optional signing packages. Existing `python -m engine.demo_*`
 commands still work. `demo` accepts only the listed names and no external input paths.
 
@@ -69,6 +70,7 @@ keeps its original scope, input, date, pin and new-output requirements.
 | Export later-date queues directly from a retained assessment | `demo inventory` | [Verified dated queues](docs/assessment-queues.md) |
 | Restore an assessment with its replay inputs | `demo assessment-archive` | [Assessment archive](docs/assessment-archive.md) |
 | Compare saved EC2 batches | `demo ec2-compare` | [Discovery comparison](docs/ec2-discovery-comparison.md) |
+| Explain changed interface address claims | `demo ec2-addresses` | [Address differences and limits](docs/ec2-discovery-comparison.md#review-interface-address-differences) |
 | Review expected and missing EC2 batches | `demo ec2-checkpoint` | [Sequence checkpoint](docs/ec2-sequence-checkpoint.md) |
 | Retain, restore and select ordered EC2 reviews | `demo ec2-history-archive` | [History archive](docs/ec2-history-archive.md), [enrollment](docs/ec2-history-enrollment.md) |
 | Verify separately enrolled operator consent | `demo ec2-operator` | [Operator acceptance](docs/ec2-operator-acceptance.md) |

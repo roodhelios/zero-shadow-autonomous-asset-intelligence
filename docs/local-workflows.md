@@ -72,6 +72,13 @@ The [discovery comparison guide](ec2-discovery-comparison.md) explains private
 retained commands, original row references and selected-field limits. Not observed
 does not mean deleted or resolved; this does not assess risk or accepted ownership.
 
+For a focused interface IPv4/IPv6 change review, run `python -m engine demo ec2-addresses`.
+Expect three added, three no-longer-observed and three retained address claims for
+one shared identity. A separate added identity shares an address but remains separate.
+The [address-difference guide](ec2-discovery-comparison.md#review-interface-address-differences)
+shows the private report fields and their limits. Address claims do not prove network
+reachability, interface attachment or effective exposure.
+
 ## Review a sequence of saved EC2 observations
 
 ```bash

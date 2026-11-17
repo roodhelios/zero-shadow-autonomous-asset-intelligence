@@ -45,6 +45,10 @@ def compare_inventories(previous, current, *, previous_export, current_export):
         fields = sorted(key for key in left.keys() | right.keys() if left.get(key) != right.get(key))
         if fields:
             changes.append({'asset_id': identifier, 'changed_fields': fields,
+                            'address_claims': {
+                                'added': sorted(set(right['ip_addresses'])-set(left['ip_addresses'])),
+                                'not_observed': sorted(set(left['ip_addresses'])-set(right['ip_addresses'])),
+                                'retained': sorted(set(left['ip_addresses']) & set(right['ip_addresses']))},
                             'previous': before[identifier], 'current': after[identifier]})
     added = [after[key] for key in sorted(after.keys()-before.keys())]
     not_observed = [before[key] for key in sorted(before.keys()-after.keys())]
@@ -63,7 +67,9 @@ def compare_inventories(previous, current, *, previous_export, current_export):
             'exports. Stable source-claimed cloud identities are compared within one claimed scope/account/region. '
             'Only projected claims are compared; input formatting, source-row positions and later observation '
             'times alone are not asset changes. Not observed does not mean deleted, stopped, resolved or absent '
-            'from the environment. This is not source authentication, complete collection, accepted ownership, '
+            'from the environment. Address-claim differences apply only to shared identities, not added or '
+            'unobserved identities. They combine selected address roles and do not prove interface attachment, '
+            'reachability or changed exposure. This is not source authentication, complete collection, accepted ownership, '
             'risk assessment, remediation, a history append or an atomic snapshot of both databases. Keep this '
             'detailed report and original evidence private.'}
 
