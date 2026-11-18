@@ -56,6 +56,58 @@ contains operational identifiers and addresses, so keep it and permitted origina
 outside Git. The digest identifies report bytes, not source authority or approval.
 Existing output files are preserved. Errors return 2 with a fixed diagnostic.
 
+## Retain address roles and supplied interface context
+
+The version-1 command above keeps its format. For selected VPC, subnet, interface
+and role fields from the original export, use the separate version-2 workflow:
+
+```bash
+python -m engine.discovery.ec2_address_review context-demo
+review_dir=$(mktemp -d)
+python -m engine.discovery.ec2_address_review review-context \
+  examples/ec2-interface-addresses.json --scope synthetic \
+  --account 111122223333 --region us-east-1 --output "$review_dir/context.json"
+```
+
+The demo returns `ec2_address_context_exercise_passed`, six shared addresses,
+two identities, 20 selected context records and two distinct supplied interface
+VPC IDs. The retained single-instance fixture command returns
+`ec2_address_context_review_created` with zero shared addresses/context records.
+Neither command establishes a collision. Repeated paths explain one identity's
+claims, not independent observations or more assets.
+
+Version 2 adds `address_contexts` to each shared observation. Every context has an
+exact `source_path` to the original address leaf, its selected role, nullable
+instance/interface VPC/subnet and interface ID fields, nullable `primary` flag,
+and nullable `associated_private_ipv4`. Paths use JSON Pointer's zero-based array
+indices; the existing reservation/instance references remain one-based. A public
+association nested in a private-address record retains that private address too.
+An interface-level association does not invent a pairing with another record.
+
+Instance and interface VPC claims stay separate, including disagreement. Missing
+interface VPC/subnet values are never inherited from the instance. Absent selected
+metadata becomes JSON null, and an absent primary flag stays distinct from false.
+Present optional IDs must have their literal `vpc-`, `subnet-` or `eni-` prefix and
+8 or 17 lowercase hexadecimal digits; present primary flags must be booleans.
+Explicit null/invalid IDs or flags reject version 2, even in an unshared instance.
+Version 1 retains its existing projection/validation behavior.
+
+The selection follows the optional network-interface fields documented in the
+[EC2 API](https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_InstanceNetworkInterface.html).
+This is still supplied local JSON, not an authenticated AWS response. Unselected
+DNS names, descriptions, tags, delegated prefixes and other original fields are
+omitted. Missing collection metadata is unknown, not a default network or proof of
+safe sharing. Role/VPC equality does not establish a collision, active attachment,
+reachability or effective exposure. No network classification or risk is inferred.
+
+Stdout adds only the aggregate `context_record_count` and version-2 status. The
+private report now also contains supplied network IDs. The same input/output
+bounds, exclusive mode-0600 publication and read-only source handling apply.
+Tests resolve every selected path back to the exact original address, retain
+different/missing VPC claims, distinguish true/false/absent flags, reject invalid
+optional fields and check the real CLI. Existing version-1/import/comparison tests
+remain required. Existing database, inventory and archive-model sources are unchanged.
+
 ## Interpretation and limits
 
 This reports shared *supplied claims*, not a confirmed collision, vulnerability,
@@ -75,5 +127,6 @@ are changed. No address lookup, scan, credential use or remediation runs.
 Tests block socket creation and cover shared identities/lineage, per-identity
 deduplication, IPv6 spelling, zero-result exports, context/pagination rejection,
 private read-only publication, no overwrite and report bounds. Prepared with
-assistant support and synthetic local data. Next: retain explicit interface/VPC and
-address-role claims before interpreting which kinds of sharing need an operator review.
+assistant support and synthetic local data. Next: define reviewed network-context
+expectations and collection coverage before interpreting which sharing claims need
+operator investigation. No automated collision or exposure rule is implemented.

@@ -72,6 +72,7 @@ keeps its original scope, input, date, pin and new-output requirements.
 | Compare saved EC2 batches | `demo ec2-compare` | [Discovery comparison](docs/ec2-discovery-comparison.md) |
 | Explain changed interface address claims | `demo ec2-addresses` | [Address differences and limits](docs/ec2-discovery-comparison.md#review-interface-address-differences) |
 | Locate distinct instance IDs claiming the same address | `python -m engine.discovery.ec2_address_review demo` | [Shared-claim review and original rows](docs/ec2-shared-addresses.md) |
+| Retain supplied address roles, interface IDs and VPC context | `python -m engine.discovery.ec2_address_review context-demo` | [Version-2 context and unknown-field limits](docs/ec2-shared-addresses.md#retain-address-roles-and-supplied-interface-context) |
 | Review expected and missing EC2 batches | `demo ec2-checkpoint` | [Sequence checkpoint](docs/ec2-sequence-checkpoint.md) |
 | Retain, restore and select ordered EC2 reviews | `demo ec2-history-archive` | [History archive](docs/ec2-history-archive.md), [enrollment](docs/ec2-history-enrollment.md) |
 | Verify separately enrolled operator consent | `demo ec2-operator` | [Operator acceptance](docs/ec2-operator-acceptance.md) |

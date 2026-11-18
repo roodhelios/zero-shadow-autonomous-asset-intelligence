@@ -70,23 +70,35 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     commands = parser.add_subparsers(dest='command', required=True)
     commands.add_parser('demo', help='temporary synthetic shared claims')
-    review = commands.add_parser('review', help='retain shared claims from one permitted saved export')
-    review.add_argument('export', type=Path)
-    review.add_argument('--scope', required=True, choices=('synthetic', 'owned', 'authorized'))
-    review.add_argument('--account', required=True)
-    review.add_argument('--region', required=True)
-    review.add_argument('--output', required=True, type=Path)
+    commands.add_parser('context-demo', help='synthetic version-2 address-role and VPC claims')
+    for name in ('review', 'review-context'):
+        review = commands.add_parser(name, help='retain shared claims; review-context also selects original interface/role fields')
+        review.add_argument('export', type=Path)
+        review.add_argument('--scope', required=True, choices=('synthetic', 'owned', 'authorized'))
+        review.add_argument('--account', required=True)
+        review.add_argument('--region', required=True)
+        review.add_argument('--output', required=True, type=Path)
     args = parser.parse_args(argv)
     try:
         if args.command == 'demo':
             result = exercise()
+        elif args.command == 'context-demo':
+            from engine.discovery.ec2_address_context import exercise as context_exercise
+            result = context_exercise()
         else:
-            report = review_addresses(_read(args.export), scope=args.scope, account=args.account, region=args.region)
+            reviewer = review_addresses
+            if args.command == 'review-context':
+                from engine.discovery.ec2_address_context import review_address_context
+                reviewer = review_address_context
+            report = reviewer(_read(args.export), scope=args.scope, account=args.account, region=args.region)
             rendered = _render(report)
             _publish(args.output, rendered)
             result = {'status': 'ec2_shared_address_review_created',
                       'report_sha256': hashlib.sha256(rendered.encode()).hexdigest(),
                       **{key: report[key] for key in ('asset_count', 'shared_address_count', 'shared_identity_count')}}
+            if args.command == 'review-context':
+                result.update(status='ec2_address_context_review_created',
+                              context_record_count=report['context_record_count'])
     except (OSError, ValueError, TypeError, KeyError, UnicodeError, RecursionError, OverflowError):
         print('error: saved EC2 address review failed; check private export, context and new output', file=sys.stderr)
         return 2
