@@ -127,6 +127,10 @@ are changed. No address lookup, scan, credential use or remediation runs.
 Tests block socket creation and cover shared identities/lineage, per-identity
 deduplication, IPv6 spelling, zero-result exports, context/pagination rejection,
 private read-only publication, no overwrite and report bounds. Prepared with
-assistant support and synthetic local data. Next: define reviewed network-context
-expectations and collection coverage before interpreting which sharing claims need
-operator investigation. No automated collision or exposure rule is implemented.
+assistant support and synthetic local data. The separate
+[network expectation review](ec2-network-expectations.md) now compares all supplied
+instance and interface identities with an independently pinned roster, including
+missing, unexpected and unidentified rows. It does not establish full collection
+or decide which shared addresses are collisions. Next: independently authenticate
+and distribute the reviewed roster and collection-time evidence. No automated
+collision or exposure rule is implemented.
