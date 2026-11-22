@@ -117,5 +117,8 @@ python -m unittest tests.test_ec2_network_expectations tests.test_ec2_address_co
 
 Prepared with assistant support and synthetic fixtures. Learning note: comparing
 an explicit independent roster makes omissions visible, but completeness remains a
-property of the collection process. Next: bind authenticated collection-time evidence
-and a trusted current roster before using these differences for operator decisions.
+property of the collection process. The separate
+[collector attestation](ec2-collector-attestation.md) now verifies an enrolled key's
+exact export/roster and capture claims before reproducing this report. It does not
+prove AWS origin or truthful collection time. Next: trusted current policy/roster
+distribution and independently reviewed capture-process evidence.
