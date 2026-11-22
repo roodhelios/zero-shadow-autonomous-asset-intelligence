@@ -74,6 +74,7 @@ keeps its original scope, input, date, pin and new-output requirements.
 | Locate distinct instance IDs claiming the same address | `python -m engine.discovery.ec2_address_review demo` | [Shared-claim review and original rows](docs/ec2-shared-addresses.md) |
 | Retain supplied address roles, interface IDs and VPC context | `python -m engine.discovery.ec2_address_review context-demo` | [Version-2 context and unknown-field limits](docs/ec2-shared-addresses.md#retain-address-roles-and-supplied-interface-context) |
 | Compare saved instance and interface claims with a separately reviewed roster | `python -m engine.discovery.ec2_network_expectations demo` | [Pinned network expectations and missing collection rows](docs/ec2-network-expectations.md) |
+| Authenticate an enrolled collector key's exact export/roster and capture claims | `python -m engine.discovery.ec2_collector_attestation demo` | [Collector attestation and key-policy limits](docs/ec2-collector-attestation.md) |
 | Review expected and missing EC2 batches | `demo ec2-checkpoint` | [Sequence checkpoint](docs/ec2-sequence-checkpoint.md) |
 | Retain, restore and select ordered EC2 reviews | `demo ec2-history-archive` | [History archive](docs/ec2-history-archive.md), [enrollment](docs/ec2-history-enrollment.md) |
 | Verify separately enrolled operator consent | `demo ec2-operator` | [Operator acceptance](docs/ec2-operator-acceptance.md) |
