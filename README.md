@@ -96,6 +96,11 @@ cooperative writers and the private POSIX filesystem conditions documented there
 
 ## Implementation status and navigation
 
+For a plain finding file, start with the [complete remediation planning command](docs/remediation-model.md#retain-a-complete-local-plan).
+It validates every JSON Lines record before emitting results and retains a new
+private output without replacing an earlier review. It plans actions for review;
+it never applies a change to an asset.
+
 | Area | Current behavior |
 | --- | --- |
 | Discovery and correlation | Saved local osquery/EC2 imports (including selected interface IPv4/IPv6 fields) and scoped fixtures. Strong identifiers merge; IP alone does not. |

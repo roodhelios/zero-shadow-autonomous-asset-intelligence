@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import shutil
 import sys
+import tempfile
 from contextlib import ExitStack
 from datetime import date
 from pathlib import Path
@@ -76,32 +79,51 @@ def plan_jsonl(
     return emitted
 
 
+def _publish(plans: TextIO, output: Path) -> None:
+    """Link a complete private file at a new name without replacing evidence."""
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", newline="\n", dir=output.parent,
+            prefix=".remediation-", delete=False,
+        ) as destination:
+            temporary = Path(destination.name)
+            shutil.copyfileobj(plans, destination)
+            destination.flush()
+            os.fsync(destination.fileno())
+        os.link(temporary, output)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Create explainable remediation plans from local JSON Lines"
     )
     parser.add_argument("input", nargs="?", default="-")
     parser.add_argument("--as-of", required=True)
-    parser.add_argument("--output", "-o", default="-")
+    parser.add_argument("--output", "-o", default="-", help="new output file, or - for stdout")
     args = parser.parse_args(argv)
 
     try:
         as_of = _date(args.as_of, "as_of")
+        # A temporary spool avoids retaining the whole review in memory. No
+        # destination is opened until every nonempty input row has validated.
         with ExitStack() as stack:
             source = (
                 sys.stdin
                 if args.input == "-"
                 else stack.enter_context(Path(args.input).open(encoding="utf-8"))
             )
-            destination = (
-                sys.stdout
-                if args.output == "-"
-                else stack.enter_context(
-                    Path(args.output).open("w", encoding="utf-8", newline="\n")
-                )
-            )
-            plan_jsonl(source, destination, as_of=as_of, source_name=args.input)
-    except (OSError, RemediationInputError, ValueError) as exc:
+            plans = stack.enter_context(tempfile.TemporaryFile(mode="w+", encoding="utf-8", newline="\n"))
+            plan_jsonl(source, plans, as_of=as_of, source_name=args.input)
+            plans.seek(0)
+            if args.output == "-":
+                shutil.copyfileobj(plans, sys.stdout)
+            else:
+                _publish(plans, Path(args.output))
+    except (OSError, RemediationInputError, ValueError, OverflowError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     return 0
