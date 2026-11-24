@@ -50,6 +50,12 @@ For a saved S3 bucket listing, run
 Expect two correlated object-storage assets, original-row references and unknown
 coverage. This is bucket identity inventory, not a public-access finding. See the
 [S3 quickstart, retained assessment and replay guide](docs/s3-inventory.md).
+To bind a separately saved policy-status response and explicit scoring review to
+one bucket, run `python -m engine s3-policy demo`. This temporary exercise retains
+and reproduces the exact generated finding in SQLite. Expect
+`s3_policy_assessment_exercise_passed` and `assessment_input_verified: true`.
+Effective exposure and source truth remain unverified. See the
+[policy evidence quickstart](docs/s3-policy-evidence.md) for retained-file commands.
 
 ```bash
 python -m engine list
