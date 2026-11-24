@@ -114,5 +114,9 @@ No live AWS collection or permissions were tested. Prepared with assistant suppo
 
 Run `python -m unittest discover -s tests -p test_s3_discovery.py -v` for local
 projection, correlation, bounds and private-file regression tests.
-Next: collect and bind separately reviewed bucket policy/exposure evidence to an
-exact retained bucket identity before treating it as an assessment input.
+The separate [saved-policy evidence workflow](s3-policy-evidence.md) now binds a
+pinned policy-status response and explicit scoring review to one account-qualified
+bucket identity. It can also check that a native retained assessment used those
+exact generated finding bytes. Source identity, capture time and effective exposure
+remain unverified. Next: independently authenticate the collector/context and review
+all applicable access controls before treating a claim as effective public access.

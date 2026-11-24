@@ -32,6 +32,9 @@ def main(argv=None):
     if arguments and arguments[0] == "discover-s3":
         from .discovery.s3_discovery import main as s3_main
         return s3_main(arguments[1:])
+    if arguments and arguments[0] == "s3-policy":
+        from .discovery.s3_policy_review import main as policy_main
+        return policy_main(arguments[1:])
     # Retained-file tools own their argument parsers, including --help.
     if arguments and arguments[0] == "inventory":
         from .inventory_cli import main as inventory_main
@@ -47,6 +50,7 @@ def main(argv=None):
     demo.add_argument("workflow", choices=[item[0] for item in WORKFLOWS])
     commands.add_parser("inventory", help="retain and reproduce saved osquery inventory")
     commands.add_parser("discover-s3", help="import a saved S3 bucket listing without AWS access")
+    commands.add_parser("s3-policy", help="bind saved policy-status and reviewed findings to an S3 identity")
     args = parser.parse_args(arguments)
     if args.command == "list":
         if args.format == "json":

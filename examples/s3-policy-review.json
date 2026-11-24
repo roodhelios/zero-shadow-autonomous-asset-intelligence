@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "scope": "synthetic",
+  "account": "123456789012",
+  "bucket": "fixture-audit-records",
+  "captured_at": "2026-11-24T00:00:00Z",
+  "opened_on": "2026-11-24",
+  "asset_tags": {"environment": "production", "owner_group": "cloud-platform"},
+  "finding": {
+    "finding_id": "synthetic-public-policy-review",
+    "severity": "medium",
+    "exposure": "limited",
+    "exploit_evidence": "none",
+    "control_state": "unknown",
+    "identity_confidence": "high"
+  }
+}
