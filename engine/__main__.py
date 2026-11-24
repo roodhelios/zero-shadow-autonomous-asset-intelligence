@@ -29,6 +29,9 @@ WORKFLOWS = (
 
 def main(argv=None):
     arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments and arguments[0] == "discover-s3":
+        from .discovery.s3_discovery import main as s3_main
+        return s3_main(arguments[1:])
     # Retained-file tools own their argument parsers, including --help.
     if arguments and arguments[0] == "inventory":
         from .inventory_cli import main as inventory_main
@@ -43,6 +46,7 @@ def main(argv=None):
     demo = commands.add_parser("demo", help="run one temporary synthetic exercise")
     demo.add_argument("workflow", choices=[item[0] for item in WORKFLOWS])
     commands.add_parser("inventory", help="retain and reproduce saved osquery inventory")
+    commands.add_parser("discover-s3", help="import a saved S3 bucket listing without AWS access")
     args = parser.parse_args(arguments)
     if args.command == "list":
         if args.format == "json":

@@ -8,6 +8,9 @@ ownership decisions, then retain and reproduce the evidence in SQLite. All examp
 use synthetic data. The project does not scan networks, enumerate cloud accounts,
 send tickets or perform remediation.
 
+Saved S3 bucket listings can also produce a standalone correlated identity inventory.
+Their integration with retained assessments remains unfinished.
+
 ## Try the complete retained-inventory exercise
 
 From the repository root, on POSIX with Python 3.11 or newer:
@@ -40,6 +43,12 @@ model. It does not establish live discovery, source truth, accepted ownership or
 completed remediation. A nonzero exit means the exercise did not complete.
 
 ## Choose a local workflow
+
+For a saved S3 bucket listing, run
+`python -m engine discover-s3 examples/s3-list-buckets.json --scope synthetic --account 123456789012`.
+Expect two correlated object-storage assets, original-row references and unknown
+coverage. This is bucket identity inventory, not a public-access finding. See the
+[S3 quickstart and private output guide](docs/s3-inventory.md).
 
 ```bash
 python -m engine list
@@ -103,7 +112,7 @@ it never applies a change to an asset.
 
 | Area | Current behavior |
 | --- | --- |
-| Discovery and correlation | Saved local osquery/EC2 imports (including selected interface IPv4/IPv6 fields) and scoped fixtures. Strong identifiers merge; IP alone does not. |
+| Discovery and correlation | Saved local osquery/EC2 imports (including selected interface IPv4/IPv6 fields), S3 bucket identity listings and scoped fixtures. Strong identifiers merge; IP alone does not. S3 coverage and exposure remain unknown. |
 | Decisions | Explainable scoring, tag-based ownership, P0 to P3 planning and explicit unassigned outcomes. Supplied claims are not independently verified. |
 | Evidence | Local SQLite retention, same-model replay, comparison, closed-file backup/archive and pinned checkpoints. Optional enrolled-key approvals and operator consent. |
 | Unfinished | Live discovery, historical model dispatch, live database backup, deployed Airflow persistence and independently distributed latest checkpoints. Some connector/infrastructure files remain placeholders. |
