@@ -25,7 +25,34 @@ The output uses mode 0600 and never replaces an existing path. The parent direct
 must already exist under your private control. Without `--output`, the inventory
 is printed to stdout, which may expose bucket names through terminal logs.
 `--format fixture` instead emits observations compatible with the existing fixture
-schema. It does not import them into the osquery-only retained-inventory database.
+schema. The standalone command does not write a database.
+
+## Retain discovery in SQLite
+
+The inventory importer also accepts the exact saved listing, an explicit account
+and a caller-supplied observation time. It creates a new private database:
+
+```bash
+review_dir=$(mktemp -d)
+python -m engine inventory import examples/s3-list-buckets.json \
+  --source-format s3 --account 123456789012 --scope synthetic \
+  --observed-at 2026-11-24T00:00:00Z --output "$review_dir/discovery.sqlite"
+python -m engine inventory export "$review_dir/discovery.sqlite" \
+  --export examples/s3-list-buckets.json --output "$review_dir/inventory.json"
+```
+
+Expect `stored` with two observations. The exported import reconciliation contains
+a version-2 receipt, `source: aws-s3-export`, supplied account and original bucket
+row references. `original_export_checked: true` means the exact original bytes and
+all converted observations reproduced. Even a change to an unselected input field
+fails replay. Without `--export`, receipt consistency does not establish original
+source reproduction. Receipt hashes are not signatures or ownership evidence.
+
+Default import remains osquery and keeps version-1 receipts. `--account` is required
+for S3 and rejected for osquery. Empty listings still work in the standalone
+importer but cannot form the existing nonempty SQLite discovery batch. No findings
+are inferred or written by discovery import. Use a private POSIX directory and
+cooperative local writers; outputs never overwrite an earlier review.
 
 The exact input SHA-256 and one-based `bucket_record` references identify original
 `Buckets` array entries even though assets are sorted. Account-qualified source

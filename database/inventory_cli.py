@@ -1,4 +1,4 @@
-"""Store a saved osquery export in a new private SQLite evidence database."""
+"""Store a saved osquery or S3 export in a new private SQLite evidence database."""
 
 import argparse
 import json
@@ -16,11 +16,19 @@ from engine.discovery.osquery_collector import _read, convert_system_info
 from engine.models import AssetObservation
 
 
-def store_export(source: Path, output: Path, *, scope: str, observed_at: datetime) -> dict:
+def store_export(source: Path, output: Path, *, scope: str, observed_at: datetime,
+                 source_format="osquery", account=None) -> dict:
     """Publish a complete one-batch database exclusively, never update an old run."""
     if os.name != "posix":
         raise ValueError("private inventory storage requires POSIX")
-    fixture = convert_system_info(_read(source), scope=scope)
+    data = _read(source)
+    if source_format == "osquery" and account is None:
+        fixture = convert_system_info(data, scope=scope)
+    elif source_format == "s3":
+        from engine.discovery.s3_discovery import convert_export
+        fixture = convert_export(data, scope=scope, account=account)
+    else:
+        raise ValueError("unsupported source format or account option")
     assets = correlate_assets(AssetObservation.from_dict(fixture["source"], item)
                               for item in fixture["assets"])
     descriptor, temporary = tempfile.mkstemp(prefix=".inventory-", dir=output.parent)
@@ -30,14 +38,18 @@ def store_export(source: Path, output: Path, *, scope: str, observed_at: datetim
         try:
             connection.executescript(Path(__file__).with_name("schema.sql").read_text())
             EvidenceRepository(connection).store_inventory(assets, scope=scope, observed_at=observed_at)
-            receipt_digest = store_receipt(connection, {
+            receipt = {
                 "schema_version": 1, "report_type": "inventory-import",
                 "source": fixture["source"], "scope": scope,
                 "observed_at": _timestamp(observed_at, "observed_at"),
                 "asset_ids": [asset.asset_id for asset in assets],
                 "observation_count": len(fixture["assets"]),
                 "input_sha256": fixture["import_metadata"]["input_sha256"],
-            })
+            }
+            if source_format == "s3":
+                receipt.update(schema_version=2, source_parameters={"account": account},
+                               source_records=fixture["import_metadata"]["source_records"])
+            receipt_digest = store_receipt(connection, receipt)
         finally:
             connection.close()
         with open(temporary, "rb") as handle:
@@ -57,11 +69,14 @@ def main(argv=None):
     parser.add_argument("export", type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--scope", required=True, choices=sorted(ALLOWED_SCOPES))
+    parser.add_argument("--source-format", choices=("osquery", "s3"), default="osquery")
+    parser.add_argument("--account", help="supplied 12-digit account, required only for S3")
     parser.add_argument("--observed-at", required=True, help="timezone-aware ISO observation time")
     args = parser.parse_args(argv)
     try:
         result = store_export(args.export, args.output, scope=args.scope,
-                              observed_at=datetime.fromisoformat(args.observed_at.replace("Z", "+00:00")))
+                              observed_at=datetime.fromisoformat(args.observed_at.replace("Z", "+00:00")),
+                              source_format=args.source_format, account=args.account)
     except (OSError, ValueError, sqlite3.DatabaseError, UnicodeError, RecursionError):
         print("error: inventory was not stored; check export, scope, time, and new output path", file=sys.stderr)
         return 2
