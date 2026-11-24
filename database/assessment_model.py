@@ -20,15 +20,26 @@ def _canonical(value):
                       separators=(",", ":"))
 
 
-def current_contract():
+def current_contract(*, source="osquery-system-info"):
     root = Path(__file__).resolve().parents[1]
-    return {"schema_version": 1, "model_id": MODEL_ID, "model_version": MODEL_VERSION,
+    if source not in ("osquery-system-info", "aws-s3-export"):
+        raise ValueError("unsupported assessment source")
+    files = SOURCE_FILES
+    if source == "aws-s3-export":
+        files += ("engine/discovery/s3_discovery.py", "database/inventory_receipt.py",
+                  "database/inventory_cli.py")
+    result = {"schema_version": 1, "model_id": MODEL_ID,
+            "model_version": MODEL_VERSION if source == "osquery-system-info" else 2,
             "implementation_sha256": {name: hashlib.sha256((root/name).read_bytes()).hexdigest()
-                                      for name in SOURCE_FILES}}
+                                      for name in files}}
+    if source == "aws-s3-export":
+        result["source"] = source
+    return result
 
 
-def store_model(connection):
-    contract = _canonical(current_contract())
+def store_model(connection, *, source="osquery-system-info"):
+    selected = current_contract(source=source)
+    contract = _canonical(selected)
     digest = hashlib.sha256(contract.encode("ascii")).hexdigest()
     connection.executescript("""
         CREATE TABLE inventory_assessment_model (
@@ -41,8 +52,11 @@ def store_model(connection):
     """)
     with connection:
         connection.execute("INSERT INTO inventory_assessment_model VALUES (1, ?, ?)", (contract, digest))
-    return {"status": "bound_current_model", "model_id": MODEL_ID,
-            "model_version": MODEL_VERSION, "binding_sha256": digest}
+    result = {"status": "bound_current_model", "model_id": MODEL_ID,
+              "model_version": selected["model_version"], "binding_sha256": digest}
+    if source == "aws-s3-export":
+        result["source"] = source
+    return result
 
 
 def read_model(connection, *, required=False):
@@ -60,8 +74,15 @@ def read_model(connection, *, required=False):
     _, payload, digest = rows[0]
     if not isinstance(payload, str) or len(payload.encode("utf-8")) > MAX_BINDING_BYTES:
         raise ValueError("invalid retained model size")
-    # Canonical bytes also distinguish booleans/floats from integer schema fields.
-    if payload != _canonical(current_contract()) or hashlib.sha256(payload.encode("ascii")).hexdigest() != digest:
+    parsed = json.loads(payload)
+    source = "aws-s3-export" if isinstance(parsed, dict) and parsed.get("source") == "aws-s3-export" else "osquery-system-info"
+    selected = current_contract(source=source)
+    # Only two fixed current contracts are selectable. Canonical bytes also
+    # distinguish booleans/floats from integer schema fields.
+    if payload != _canonical(selected) or hashlib.sha256(payload.encode("ascii")).hexdigest() != digest:
         raise ValueError("retained model is unsupported or differs from the current implementation")
-    return {"status": "bound_current_model", "model_id": MODEL_ID,
-            "model_version": MODEL_VERSION, "binding_sha256": digest}
+    result = {"status": "bound_current_model", "model_id": MODEL_ID,
+              "model_version": selected["model_version"], "binding_sha256": digest}
+    if source == "aws-s3-export":
+        result["source"] = source
+    return result

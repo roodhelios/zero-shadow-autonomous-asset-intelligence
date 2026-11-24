@@ -28,6 +28,7 @@ RUNTIME_FILES = tuple(sorted(set(SOURCE_FILES) | {
     'database/inventory_cli.py', 'database/inventory_export_cli.py',
     'database/inventory_receipt.py', 'database/evidence_reader.py',
     'database/repository.py', 'database/schema.sql',
+    'engine/discovery/s3_discovery.py',
 }))
 REQUIREMENTS = {'python': '3.11 or newer', 'dependencies': 'standard-library', 'storage': 'POSIX'}
 
@@ -69,7 +70,10 @@ def _reproduce(data, export):
             connection.execute('PRAGMA trusted_schema=OFF')
             if connection.execute('PRAGMA integrity_check').fetchall() != [('ok',)]:
                 raise ValueError('assessment integrity check failed')
-        return verify_assessment(path, export, require_model_binding=True)
+        verified = verify_assessment(path, export, require_model_binding=True)
+        if verified['model_binding']['model_version'] != 1:
+            raise ValueError('this archive format supports osquery model version 1 only')
+        return verified
 
 
 def _destination(path):

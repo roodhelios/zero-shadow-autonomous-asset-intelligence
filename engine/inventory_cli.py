@@ -1,4 +1,4 @@
-"""Retain and reproduce saved osquery inventory through the existing local tools."""
+"""Retain and reproduce saved osquery or S3 inventory through local tools."""
 
 import argparse
 from importlib import import_module

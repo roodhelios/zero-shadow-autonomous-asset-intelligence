@@ -94,7 +94,7 @@ def retain_assessment(database, finding_data, directory_data, output, *, as_of,
                 EvidenceReader(connection).read_asset(asset_id)
             if connection.execute("PRAGMA foreign_key_check").fetchall():
                 raise ValueError("retained decisions have invalid references")
-            model_binding = store_model(connection)
+            model_binding = store_model(connection, source=receipt["source"])
         finally:
             connection.close()
         with temporary.open("rb") as handle:

@@ -14,6 +14,7 @@ from engine.discovery.osquery_collector import _read, convert_inventory
 
 FIELDS = {"schema_version", "report_type", "source", "scope", "observed_at",
           "input_sha256", "asset_ids", "observation_count"}
+S3_FIELDS = FIELDS | {"source_parameters", "source_records"}
 
 
 def _canonical(value):
@@ -43,16 +44,32 @@ def read_receipt(connection, *, export_data=None):
     if row is None:
         raise ValueError("inventory import receipt is missing")
     receipt = json.loads(row[0])
-    if not isinstance(receipt, dict) or set(receipt) != FIELDS:
+    if not isinstance(receipt, dict):
         raise ValueError("unsupported import receipt")
-    if (type(receipt["schema_version"]) is not int or receipt["schema_version"] != 1
-            or receipt["report_type"] != "inventory-import"
-            or receipt["source"] != "osquery-system-info"
+    version = receipt.get("schema_version")
+    if type(version) is not int or version not in (1, 2):
+        raise ValueError("unsupported import receipt")
+    if set(receipt) != (FIELDS if version == 1 else S3_FIELDS):
+        raise ValueError("unsupported import receipt")
+    if (receipt["report_type"] != "inventory-import"
+            or receipt["source"] != ("osquery-system-info" if version == 1 else "aws-s3-export")
             or receipt["scope"] not in ("synthetic", "owned", "authorized")
             or not isinstance(receipt["input_sha256"], str)
             or not re.fullmatch(r"[a-f0-9]{64}", receipt["input_sha256"])
             or type(receipt["observation_count"]) is not int or receipt["observation_count"] < 1):
         raise ValueError("invalid import receipt fields")
+    if version == 2:
+        parameters, references = receipt["source_parameters"], receipt["source_records"]
+        if (not isinstance(parameters, dict) or set(parameters) != {"account"}
+                or not isinstance(parameters["account"], str)
+                or not re.fullmatch(r"[0-9]{12}", parameters["account"])
+                or not isinstance(references, list) or len(references) != receipt["observation_count"]):
+            raise ValueError("invalid S3 source context")
+        for position, reference in enumerate(references, 1):
+            if (not isinstance(reference, dict) or set(reference) != {"bucket_record", "source_record_id"}
+                    or type(reference["bucket_record"]) is not int or reference["bucket_record"] != position
+                    or not isinstance(reference["source_record_id"], str)):
+                raise ValueError("invalid S3 source row reference")
     if hashlib.sha256(_canonical(receipt).encode()).hexdigest() != row[1]:
         raise ValueError("import receipt digest mismatch")
     ids = [item[0] for item in connection.execute("SELECT asset_id FROM assets ORDER BY asset_id")]
@@ -66,11 +83,28 @@ def read_receipt(connection, *, export_data=None):
     if any(item["scope"] != receipt["scope"] or item["observed_at"] != receipt["observed_at"]
            or item["source"] != receipt["source"] for item in observations):
         raise ValueError("receipt does not match observation metadata")
+    if version == 2 and sorted(r["source_record_id"] for r in receipt["source_records"]) != sorted(
+            item["payload"]["source_record_id"] for item in observations):
+        raise ValueError("S3 row references do not match observations")
+    if version == 2 and any(item["payload"].get("cloud_account") != receipt["source_parameters"]["account"]
+            or item["payload"].get("source_record_id") != receipt["source_parameters"]["account"] + "/" +
+                str(item["payload"].get("cloud_resource_id")) for item in observations):
+        raise ValueError("S3 account context does not match observations")
     if export_data is not None:
-        inventory = convert_inventory(export_data, scope=receipt["scope"])
+        if version == 1:
+            inventory = convert_inventory(export_data, scope=receipt["scope"])
+            input_digest = inventory["input_sha256"]
+        else:
+            from engine.discovery.s3_discovery import convert_export, inventory as s3_inventory
+            converted = convert_export(export_data, scope=receipt["scope"],
+                                       account=receipt["source_parameters"]["account"])
+            inventory = s3_inventory(converted)
+            input_digest = inventory["import_metadata"]["input_sha256"]
+            if inventory["import_metadata"]["source_records"] != receipt["source_records"]:
+                raise ValueError("S3 source rows do not reproduce")
         payloads = sorted(_canonical(item["payload"]) for item in observations)
         expected = sorted(_canonical(item) for asset in inventory["assets"] for item in asset["observations"])
-        if (inventory["input_sha256"] != receipt["input_sha256"]
+        if (input_digest != receipt["input_sha256"]
                 or [asset["asset_id"] for asset in inventory["assets"]] != ids or payloads != expected):
             raise ValueError("retained export does not match import receipt")
     return {"schema_version": 1, "status": "consistent", "receipt": receipt,
