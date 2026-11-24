@@ -1,4 +1,4 @@
-"""Export dated work queues from a fully reproduced retained osquery assessment."""
+"""Export dated work queues from a fully reproduced retained assessment."""
 
 import argparse
 from contextlib import closing
@@ -48,7 +48,7 @@ def build_queues(database, export_data, *, expected_database_sha256, as_of):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
     parser.add_argument('database', type=Path)
-    parser.add_argument('--export', type=Path, required=True, help='original saved osquery export')
+    parser.add_argument('--export', type=Path, required=True, help='original saved osquery or S3 export')
     parser.add_argument('--expected-database-sha256', required=True)
     parser.add_argument('--as-of', required=True, help='explicit date on or after the retained assessment date')
     parser.add_argument('--output', type=Path, required=True, help='new private JSON output file')

@@ -54,6 +54,38 @@ importer but cannot form the existing nonempty SQLite discovery batch. No findin
 are inferred or written by discovery import. Use a private POSIX directory and
 cooperative local writers; outputs never overwrite an earlier review.
 
+## Assess supplied findings and reproduce the result
+
+Continue in the same private directory. The separate findings file is deliberately
+synthetic: its severity, exposure, control state and reviewed routing tags are
+supplied claims. They are not conclusions drawn from the bucket listing.
+
+```bash
+python -m engine inventory assess "$review_dir/discovery.sqlite" \
+  examples/s3-inventory-findings.jsonl --directory examples/ownership-directory.json \
+  --export examples/s3-list-buckets.json --as-of 2026-11-24 \
+  --assessed-at 2026-11-24T01:00:00Z --output "$review_dir/assessment.sqlite"
+python -m engine inventory verify "$review_dir/assessment.sqlite" \
+  --export examples/s3-list-buckets.json --require-model-binding
+```
+
+Expect `assessment_stored`, then `assessment_reproduced` with two assets, one
+supplied finding and `model_binding.model_version: 2`. The remaining asset is
+unassessed, not clean. The original discovery database is unchanged and is not
+needed for subsequent verification. Retain the exact original listing separately.
+
+S3 uses a separate current model contract that also pins the S3 converter and
+import/receipt code. Legacy osquery model version 1 and its source-file selection
+remain unchanged. A valid osquery binding cannot label an S3 receipt. This is
+same-model consistency replay, not a signature, source authentication or historical
+model dispatch. A changed model requires a new reviewed assessment.
+
+The existing dated queue commands also work after complete assessment replay.
+Follow the [pinned queue steps](inventory-commands.md#produce-and-reproduce-a-dated-queue)
+with this assessment database and the S3 original in each `--export` argument.
+The osquery version-1 archive format deliberately refuses S3 assessments until a
+separate source-complete archive contract is implemented and tested.
+
 The exact input SHA-256 and one-based `bucket_record` references identify original
 `Buckets` array entries even though assets are sorted. Account-qualified source
 record IDs prevent conflicting supplied account claims from merging merely because
@@ -82,5 +114,5 @@ No live AWS collection or permissions were tested. Prepared with assistant suppo
 
 Run `python -m unittest discover -s tests -p test_s3_discovery.py -v` for local
 projection, correlation, bounds and private-file regression tests.
-Next: connect selected bucket observations to retained assessment inputs while
-preserving source rows and keeping policy/exposure evidence separate.
+Next: collect and bind separately reviewed bucket policy/exposure evidence to an
+exact retained bucket identity before treating it as an assessment input.

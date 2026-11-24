@@ -1,4 +1,4 @@
-"""Reproduce a retained first assessment from its inputs and original osquery export."""
+"""Reproduce a retained first assessment from its inputs and original saved export."""
 
 import argparse
 import hashlib
@@ -81,12 +81,17 @@ def verify_assessment(database, export_data, *, require_model_binding=False):
             raise ValueError("noncanonical assessment dates")
         retained = export_inventory(snapshot, export_data=export_data)
         receipt = retained["import_reconciliation"]["receipt"]
+        if (model_binding["status"] == "bound_current_model" and
+                model_binding.get("source", "osquery-system-info") != receipt["source"]):
+            raise ValueError("model source does not match import receipt")
         source = root / "source.json"
         source.write_bytes(export_data)
         source.chmod(0o600)
         discovery = root / "discovery.sqlite"
         store_export(source, discovery, scope=receipt["scope"],
-                     observed_at=datetime.fromisoformat(receipt["observed_at"].replace("Z", "+00:00")))
+                     observed_at=datetime.fromisoformat(receipt["observed_at"].replace("Z", "+00:00")),
+                     source_format="s3" if receipt["source"] == "aws-s3-export" else "osquery",
+                     account=receipt.get("source_parameters", {}).get("account"))
         initial = export_inventory(discovery, export_data=export_data)
         # Reproduce the recorded binding flag, without treating it as historical proof.
         initial["import_reconciliation"]["original_export_checked"] = binding["original_export_checked"]
@@ -112,7 +117,7 @@ def verify_assessment(database, export_data, *, require_model_binding=False):
             "asset_count": result["inventory_asset_count"], "finding_count": result["finding_count"],
             "original_export_checked": True, "input_sha256": expected_digests,
             "interpretation": "Stored findings, ownership decisions and plans reproduce from retained "
-            "inputs and the separately supplied osquery export using the current model. This does not "
+            "inputs and the separately supplied saved export using the current model. This does not "
             "authenticate a reviewer, source claims, historical validation time or accepted ownership, "
             "and does not establish remediation."}
 

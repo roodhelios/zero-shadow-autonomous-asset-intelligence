@@ -165,7 +165,7 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("database", type=Path)
     parser.add_argument("--export", type=Path,
-                        help="optionally verify against the original saved osquery export")
+                        help="optionally verify against the original saved osquery or S3 export")
     parser.add_argument("--output", type=Path,
                         help="publish a new private file instead of printing to stdout")
     parser.add_argument("--format", choices=("json", "text", "coverage", "review"),

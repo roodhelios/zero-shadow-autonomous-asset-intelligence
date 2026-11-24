@@ -8,8 +8,9 @@ ownership decisions, then retain and reproduce the evidence in SQLite. All examp
 use synthetic data. The project does not scan networks, enumerate cloud accounts,
 send tickets or perform remediation.
 
-Saved S3 bucket listings can also produce a standalone correlated identity inventory.
-Their integration with retained assessments remains unfinished.
+Saved S3 bucket listings can also produce a correlated identity inventory and a
+retained assessment from separately supplied findings. Listing data alone does not
+establish exposure or security findings.
 
 ## Try the complete retained-inventory exercise
 
@@ -48,7 +49,7 @@ For a saved S3 bucket listing, run
 `python -m engine discover-s3 examples/s3-list-buckets.json --scope synthetic --account 123456789012`.
 Expect two correlated object-storage assets, original-row references and unknown
 coverage. This is bucket identity inventory, not a public-access finding. See the
-[S3 quickstart and private output guide](docs/s3-inventory.md).
+[S3 quickstart, retained assessment and replay guide](docs/s3-inventory.md).
 
 ```bash
 python -m engine list

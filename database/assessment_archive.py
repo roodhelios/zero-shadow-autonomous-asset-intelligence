@@ -70,7 +70,10 @@ def _reproduce(data, export):
             connection.execute('PRAGMA trusted_schema=OFF')
             if connection.execute('PRAGMA integrity_check').fetchall() != [('ok',)]:
                 raise ValueError('assessment integrity check failed')
-        return verify_assessment(path, export, require_model_binding=True)
+        verified = verify_assessment(path, export, require_model_binding=True)
+        if verified['model_binding']['model_version'] != 1:
+            raise ValueError('this archive format supports osquery model version 1 only')
+        return verified
 
 
 def _destination(path):
