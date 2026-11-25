@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "scope": "synthetic",
+  "account": "123456789012",
+  "bucket": "fixture-audit-records",
+  "window_start": "2026-11-24T00:00:00Z",
+  "window_end": "2026-11-24T00:05:00Z",
+  "maximum_skew_seconds": 300,
+  "bucket_captured_at": "2026-11-24T00:01:00Z",
+  "account_captured_at": "2026-11-24T00:02:00Z"
+}

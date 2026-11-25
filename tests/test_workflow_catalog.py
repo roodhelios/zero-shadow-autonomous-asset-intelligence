@@ -23,8 +23,8 @@ class WorkflowCatalogTests(unittest.TestCase):
             importer.assert_not_called()
         report = json.loads(output.getvalue())
         self.assertEqual(report['schema_version'], 1)
-        self.assertEqual(len(report['workflows']), 16)
-        self.assertEqual(len({item['name'] for item in report['workflows']}), 16)
+        self.assertEqual(len(report['workflows']), 18)
+        self.assertEqual(len({item['name'] for item in report['workflows']}), 18)
         self.assertEqual(sum(item['dependencies'] == 'requirements-review.txt'
                              for item in report['workflows']), 3)
 
@@ -72,6 +72,15 @@ class WorkflowCatalogTests(unittest.TestCase):
                                     cwd=ROOT, capture_output=True, text=True, timeout=10)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertTrue(result.stdout)
+
+    def test_catalogued_s3_policy_runs_native_assessment_without_site_packages(self):
+        result = subprocess.run([sys.executable, '-S', '-m', 'engine', 'demo', 's3-policy'],
+                                cwd=ROOT, capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = json.loads(result.stdout)
+        self.assertEqual(report['status'], 's3_policy_assessment_exercise_passed')
+        self.assertTrue(report['assessment_input_verified'])
+        self.assertFalse(report['effective_exposure_verified'])
 
 
 if __name__ == '__main__':

@@ -100,8 +100,10 @@ omit bucket/account IDs, raw findings and paths. Full private files contain them
 AWS documents the policy-status [CLI response](https://docs.aws.amazon.com/cli/latest/reference/s3api/get-bucket-policy-status.html).
 Its [Block Public Access documentation](https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetPublicAccessBlock.html)
 explains that effective behavior also depends on applicable account and organization
-controls. This tool does not parse those controls, ACLs, object policies or actual
-requests. A saved true flag is evidence for review, not proof that anonymous users
+controls. A separate [saved control review](s3-access-controls.md) now combines
+bucket/account Block Public Access claims without changing these findings. This
+policy tool does not parse those controls, ACLs, object policies or actual requests.
+A saved true flag is evidence for review, not proof that anonymous users
 can access objects. Account association, captures, exposure and scoring remain
 supplied claims. No ownership acceptance, live collection or remediation occurs.
 
