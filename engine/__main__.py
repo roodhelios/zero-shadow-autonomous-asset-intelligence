@@ -8,6 +8,7 @@ import sys
 
 # Only these bundled exercises can run. User input never becomes a module path.
 WORKFLOWS = (
+    ("s3-access", "demo_s3_access_review", "standard-library", "Review saved bucket/account public-access controls with explicit unknowns"),
     ("s3-policy", "demo_s3_policy_review", "standard-library", "Bind saved S3 policy evidence to a retained assessment"),
     ("inventory", "demo_inventory", "standard-library", "Import, assess and reproduce saved osquery inventory"),
     ("assessment-backup", "demo_assessment_backup", "standard-library", "Restore an exact closed assessment backup"),
@@ -30,6 +31,9 @@ WORKFLOWS = (
 
 def main(argv=None):
     arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments and arguments[0] == "s3-access":
+        from .discovery.s3_access_review import main as access_main
+        return access_main(arguments[1:])
     if arguments and arguments[0] == "discover-s3":
         from .discovery.s3_discovery import main as s3_main
         return s3_main(arguments[1:])
@@ -52,6 +56,7 @@ def main(argv=None):
     commands.add_parser("inventory", help="retain and reproduce saved osquery inventory")
     commands.add_parser("discover-s3", help="import a saved S3 bucket listing without AWS access")
     commands.add_parser("s3-policy", help="bind saved policy-status and reviewed findings to an S3 identity")
+    commands.add_parser("s3-access", help="review saved bucket/account controls with capture context")
     args = parser.parse_args(arguments)
     if args.command == "list":
         if args.format == "json":

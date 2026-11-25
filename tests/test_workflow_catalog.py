@@ -23,8 +23,8 @@ class WorkflowCatalogTests(unittest.TestCase):
             importer.assert_not_called()
         report = json.loads(output.getvalue())
         self.assertEqual(report['schema_version'], 1)
-        self.assertEqual(len(report['workflows']), 17)
-        self.assertEqual(len({item['name'] for item in report['workflows']}), 17)
+        self.assertEqual(len(report['workflows']), 18)
+        self.assertEqual(len({item['name'] for item in report['workflows']}), 18)
         self.assertEqual(sum(item['dependencies'] == 'requirements-review.txt'
                              for item in report['workflows']), 3)
 

@@ -64,10 +64,14 @@ python -m engine demo ec2-compare
 python -m engine demo ec2-addresses
 ```
 
-The catalog lists all 17 bundled temporary exercises and their dependencies, including
+The catalog lists all 18 bundled temporary exercises and their dependencies, including
 `python -m engine demo s3-policy` for the retained policy-evidence workflow. Help
 and listing do not load optional signing packages. Existing `python -m engine.demo_*`
 commands still work. `demo` accepts only the listed names and no external input paths.
+For separately saved bucket and account Block Public Access settings, run
+`python -m engine demo s3-access`. The [control review guide](docs/s3-access-controls.md)
+explains combined claims, missing-data states and retained report verification.
+It preserves the reviewed finding and does not establish live exposure or remediation.
 
 To retain your own reviewed files rather than run a temporary exercise:
 
