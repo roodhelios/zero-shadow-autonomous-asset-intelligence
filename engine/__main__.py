@@ -8,6 +8,7 @@ import sys
 
 # Only these bundled exercises can run. User input never becomes a module path.
 WORKFLOWS = (
+    ("s3-policy", "demo_s3_policy_review", "standard-library", "Bind saved S3 policy evidence to a retained assessment"),
     ("inventory", "demo_inventory", "standard-library", "Import, assess and reproduce saved osquery inventory"),
     ("assessment-backup", "demo_assessment_backup", "standard-library", "Restore an exact closed assessment backup"),
     ("assessment-archive", "demo_assessment_archive", "standard-library", "Restore an assessment with retained replay inputs"),

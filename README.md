@@ -64,7 +64,8 @@ python -m engine demo ec2-compare
 python -m engine demo ec2-addresses
 ```
 
-The catalog lists all 16 bundled temporary exercises and their dependencies. Help
+The catalog lists all 17 bundled temporary exercises and their dependencies, including
+`python -m engine demo s3-policy` for the retained policy-evidence workflow. Help
 and listing do not load optional signing packages. Existing `python -m engine.demo_*`
 commands still work. `demo` accepts only the listed names and no external input paths.
 
